@@ -22,7 +22,8 @@ async def test_flow_user_then_channels(hass, aioclient_mock, guide_xml) -> None:
     assert result["step_id"] == "channels"
     options = result["data_schema"].schema["channels"].config["options"]
     assert options == [
-        {"value": "Other", "label": "Other channel"},
+        # The card config needs the guide id, so the label shows it when it is not the name.
+        {"value": "Other", "label": "Other channel (id: Other)"},
         {"value": "Polsat", "label": "Polsat"},
         {"value": "TVN", "label": "TVN"},
     ]
@@ -77,6 +78,7 @@ async def test_options_flow_changes_channels(hass, loaded_entry, aioclient_mock)
     assert aioclient_mock.call_count == calls
     options = result["data_schema"].schema["channels"].config["options"]
     assert {o["value"] for o in options} == {"TVN", "Polsat", "Other"}
+    assert {o["label"] for o in options} == {"TVN", "Polsat", "Other channel (id: Other)"}
 
     result = await hass.config_entries.options.async_configure(
         result["flow_id"], {"channels": ["TVN"], "update_interval": 6}
