@@ -1,7 +1,7 @@
 import { LitElement, css, html, nothing } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import type { ChannelConfig } from '../config';
-import { dayLabel, formatTime, progress, tvDayKey } from '../data/time';
+import { dayLabel, formatTime, progress } from '../data/time';
 import type { Translate } from '../i18n';
 import type { Programme } from '../types/api';
 import { fire } from './events';
@@ -9,6 +9,7 @@ import './tvg-day-chips';
 import './tvg-progress';
 import {
   BrokenPosters,
+  overlapsDay,
   renderChannelTitle,
   renderCloseButton,
   renderLoading,
@@ -151,9 +152,9 @@ export class TvgChannelView extends LitElement {
     `,
   ];
 
-  /** Programmes of the chosen day. */
+  /** Programmes of the chosen day, including one that started before the day start and still runs. */
   private dayProgrammes(): Programme[] {
-    return this.programmes.filter((p) => tvDayKey(Date.parse(p.start), this.timeZone, this.startHour) === this.selectedDay);
+    return this.programmes.filter((p) => overlapsDay(p, this.selectedDay, this.timeZone, this.startHour));
   }
 
   private renderSlot(programme: Programme) {
@@ -196,7 +197,7 @@ export class TvgChannelView extends LitElement {
       ></tvg-day-chips>
       <div class="sched">
         ${ended.length
-          ? html`<button class="earlier" @click=${() => fire(this, 'tvg-show-earlier', {})}>${this.t('earlier', ended.length)}</button>`
+          ? html`<button class="text-btn" @click=${() => fire(this, 'tvg-show-earlier', {})}>${this.t('earlier', ended.length)}</button>`
           : nothing}
         ${shown.map((p) => this.renderSlot(p))}
       </div>

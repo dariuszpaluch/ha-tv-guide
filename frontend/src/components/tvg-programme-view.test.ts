@@ -143,22 +143,22 @@ const series = (n: number): Programme[] =>
 test('a group with 5 airings shows 3 rows and "Show all (5)"; a click shows all 5', async () => {
   const el = await mount({ airings: series(5) });
   expect($$(el, '.air')).toHaveLength(3);
-  const more = $<HTMLButtonElement>(el, '.airings .earlier');
+  const more = $<HTMLButtonElement>(el, '.airings .text-btn');
   expect(text(more)).toBe('Show all (5)');
   more?.click();
   await el.updateComplete;
   expect($$(el, '.air')).toHaveLength(5);
-  expect($(el, '.airings .earlier')).toBeNull();
+  expect($(el, '.airings .text-btn')).toBeNull();
 });
 
 test('a group with 3 airings has no "Show all" button', async () => {
   const el = await mount({ airings: series(3) });
-  expect($(el, '.airings .earlier')).toBeNull();
+  expect($(el, '.airings .text-btn')).toBeNull();
 });
 
 test('"Show all" resets when the programme changes', async () => {
   const el = await mount({ airings: series(5) });
-  $<HTMLButtonElement>(el, '.airings .earlier')?.click();
+  $<HTMLButtonElement>(el, '.airings .text-btn')?.click();
   await el.updateComplete;
   expect($$(el, '.air')).toHaveLength(5);
   el.programme = uwagaTomorrow;
@@ -186,4 +186,17 @@ test('the switch button fires tvg-switch with the channel number', async () => {
   el.addEventListener('tvg-switch', (e) => onSwitch(e.detail));
   $<HTMLButtonElement>(el, '.actions .btn')?.click();
   expect(onSwitch).toHaveBeenCalledWith({ number: 5 });
+});
+
+test('a live programme that started before the day start shows no day label and the time left', async () => {
+  const early: Programme = {
+    ...uwagaTomorrow,
+    id: 'TVN|early',
+    start: '2026-10-19T04:30:00+02:00',
+    stop: '2026-10-19T05:30:00+02:00',
+  };
+  const el = await mount({ programme: early, now: Date.parse('2026-10-19T05:10:00+02:00') });
+  expect(text($(el, '.timing b'))).toBe('04:30 - 05:30');
+  expect(text($(el, '.timing > span'))).toBe('20 min left');
+  expect($(el, 'tvg-progress')).not.toBeNull();
 });

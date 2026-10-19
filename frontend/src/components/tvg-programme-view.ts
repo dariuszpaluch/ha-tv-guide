@@ -10,6 +10,7 @@ import './tvg-logo';
 import './tvg-progress';
 import {
   BrokenPosters,
+  overlapsDay,
   renderBackButton,
   renderChannelTitle,
   renderCloseButton,
@@ -194,7 +195,7 @@ export class TvgProgrammeView extends LitElement {
   private renderTiming(programme: Programme) {
     const start = Date.parse(programme.start);
     const stop = Date.parse(programme.stop);
-    const today = this.dayKeyOf(programme) === this.todayKey;
+    const today = overlapsDay(programme, this.todayKey, this.timeZone, this.startHour);
     const day = today ? '' : `${dayLabel(this.dayKeyOf(programme), this.todayKey, this.locale, this.t)}, `;
     const range = `${formatTime(start, this.locale, this.timeZone, this.hour12)} - ${formatTime(stop, this.locale, this.timeZone, this.hour12)}`;
     const when = today
@@ -210,13 +211,12 @@ export class TvgProgrammeView extends LitElement {
   private renderChips(programme: Programme) {
     const chips = [
       ...programme.categories.map((category) => html`<span>${category}</span>`),
-      programme.rating ? html`<span class="age">${programme.rating}+</span>` : nothing,
-      programme.year ? html`<span>${programme.year}</span>` : nothing,
-      programme.countries.length ? html`<span>${programme.countries.join(', ')}</span>` : nothing,
-      programme.star_rating ? html`<span>★ ${programme.star_rating}</span>` : nothing,
-    ];
-    const hasChips = programme.categories.length || programme.rating || programme.year || programme.countries.length || programme.star_rating;
-    return hasChips ? html`<div class="meta">${chips}</div>` : nothing;
+      programme.rating ? html`<span class="age">${programme.rating}+</span>` : null,
+      programme.year ? html`<span>${programme.year}</span>` : null,
+      programme.countries.length ? html`<span>${programme.countries.join(', ')}</span>` : null,
+      programme.star_rating ? html`<span>★ ${programme.star_rating}</span>` : null,
+    ].filter((chip) => chip !== null);
+    return chips.length ? html`<div class="meta">${chips}</div>` : nothing;
   }
 
   private renderAiring(airing: Programme, config: ChannelConfig, entry?: ChannelEntry) {
@@ -245,7 +245,7 @@ export class TvgProgrammeView extends LitElement {
       <div class="grp">${title}</div>
       ${shown.map(({ airing, config, entry }) => this.renderAiring(airing, config, entry))}
       ${!open && rows.length > AIRINGS_SHOWN
-        ? html`<button class="earlier" @click=${() => (this.expanded = { ...this.expanded, [key]: true })}>
+        ? html`<button class="text-btn" @click=${() => (this.expanded = { ...this.expanded, [key]: true })}>
             ${this.t('showAll', rows.length)}
           </button>`
         : nothing}

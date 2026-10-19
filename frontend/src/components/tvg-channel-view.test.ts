@@ -1,6 +1,6 @@
-import { afterEach, expect, test, vi } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import type { ChannelConfig } from '../config';
-import { NOW, WAW, fakty, faktyTomorrow, sport, tEn, uwagaTomorrow } from '../test/fixtures';
+import { NOW, WAW, fakty, faktyTomorrow, nocneKino, poKinie, sport, tEn, uwagaTomorrow } from '../test/fixtures';
 import type { Programme } from '../types/api';
 import './tvg-channel-view';
 import { viewStyles } from './view-parts';
@@ -48,14 +48,14 @@ afterEach(() => document.body.replaceChildren());
 test('today hides ended programmes behind "Show N earlier"', async () => {
   const el = await mount();
   expect($$(el, '.slot').map((s) => s.querySelector('.title')?.textContent)).toEqual(['Fakty', 'Sport']);
-  expect($(el, '.earlier')?.textContent?.trim()).toBe('Show 2 earlier');
+  expect($(el, '.text-btn')?.textContent?.trim()).toBe('Show 2 earlier');
 });
 
 test('a click on "Show N earlier" fires tvg-show-earlier', async () => {
   const el = await mount();
   const onEarlier = vi.fn();
   el.addEventListener('tvg-show-earlier', onEarlier);
-  $<HTMLButtonElement>(el, '.earlier')?.click();
+  $<HTMLButtonElement>(el, '.text-btn')?.click();
   expect(onEarlier).toHaveBeenCalledOnce();
 });
 
@@ -63,7 +63,7 @@ test('with showEarlier the ended programmes show and the button is gone', async 
   const el = await mount({ showEarlier: true });
   expect($$(el, '.slot')).toHaveLength(4);
   expect($(el, '.slot.past')).not.toBeNull();
-  expect($(el, '.earlier')).toBeNull();
+  expect($(el, '.text-btn')).toBeNull();
 });
 
 test('another day shows all its programmes and no "earlier" button', async () => {
@@ -72,7 +72,7 @@ test('another day shows all its programmes and no "earlier" button', async () =>
     selectedDay: '2026-10-20',
   });
   expect($$(el, '.slot .title').map((s) => s.textContent)).toEqual(['Fakty', 'Uwaga']);
-  expect($(el, '.earlier')).toBeNull();
+  expect($(el, '.text-btn')).toBeNull();
 });
 
 test('the live programme has the bigger poster, a description and a progress bar', async () => {
@@ -155,4 +155,39 @@ test('the switch button fires tvg-switch with the number', async () => {
   el.addEventListener('tvg-switch', (e) => onSwitch(e.detail));
   $<HTMLButtonElement>(el, '.actions .btn')?.click();
   expect(onSwitch).toHaveBeenCalledWith({ number: 5 });
+});
+
+describe('programmes across the TV-day start', () => {
+  const AT_0510 = Date.parse('2026-10-19T05:10:00+02:00');
+  const earlyNews = earlier('Poranek', '2026-10-19T04:30:00+02:00', '2026-10-19T05:30:00+02:00');
+  const night = earlier('Noc', '2026-10-19T03:00:00+02:00', '2026-10-19T04:30:00+02:00');
+  const morning = earlier('Rano', '2026-10-19T05:30:00+02:00', '2026-10-19T06:30:00+02:00');
+
+  test('a programme that started before the day start and still runs is the live row of today', async () => {
+    const el = await mount({ programmes: [night, earlyNews, morning], now: AT_0510 });
+    expect($$(el, '.slot .title').map((s) => s.textContent)).toEqual(['Poranek', 'Rano']);
+    expect($(el, '.slot.live .title')?.textContent).toBe('Poranek');
+    expect($(el, '.text-btn')).toBeNull();
+  });
+
+  test('"Show N earlier" still counts only ended programmes', async () => {
+    const ended = earlier('Skończony', '2026-10-19T05:00:00+02:00', '2026-10-19T05:05:00+02:00');
+    const el = await mount({ programmes: [ended, earlyNews, morning], now: AT_0510 });
+    expect($(el, '.text-btn')?.textContent?.trim()).toBe('Show 1 earlier');
+    expect($$(el, '.slot .title').map((s) => s.textContent)).toEqual(['Poranek', 'Rano']);
+  });
+
+  test('the same programme is also listed on the previous day', async () => {
+    const el = await mount({ programmes: [night, earlyNews, morning], now: AT_0510, selectedDay: '2026-10-18' });
+    expect($$(el, '.slot .title').map((s) => s.textContent)).toEqual(['Noc', 'Poranek']);
+  });
+
+  test('the 25-hour day of the clock change lists every programme once', async () => {
+    const after = earlier('Po zmianie', '2026-10-25T10:00:00+01:00', '2026-10-25T11:00:00+01:00');
+    const programmes = [nocneKino, poKinie, after];
+    const dayOne = await mount({ programmes, selectedDay: '2026-10-24', days: ['2026-10-24', '2026-10-25'] });
+    expect($$(dayOne, '.slot .title').map((s) => s.textContent)).toEqual(['Nocne kino', 'Po kinie']);
+    const dayTwo = await mount({ programmes, selectedDay: '2026-10-25', days: ['2026-10-24', '2026-10-25'] });
+    expect($$(dayTwo, '.slot .title').map((s) => s.textContent)).toEqual(['Po zmianie']);
+  });
 });

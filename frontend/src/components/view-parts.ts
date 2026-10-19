@@ -1,19 +1,30 @@
-import { css, html, type ReactiveController, type ReactiveControllerHost, type TemplateResult } from 'lit';
+import { css, html, type ReactiveControllerHost, type TemplateResult } from 'lit';
 import type { ChannelConfig } from '../config';
 import type { Translate } from '../i18n';
+import { tvDayRange } from '../data/time';
+import type { Programme } from '../types/api';
 import { fire } from './events';
 import { icon, iconStyles } from './icons';
 import './tvg-logo';
 
+/**
+ * Whether a programme belongs to a TV day. A programme that overlaps the day range belongs to it,
+ * so one that crosses the day start (04:30-05:30) is on both days. The server lists days the same way.
+ * @param programme The programme.
+ * @param key Day key, `YYYY-MM-DD`.
+ * @param timeZone IANA time zone name.
+ * @param startHour Local hour at which a TV day starts.
+ */
+export const overlapsDay = (programme: Programme, key: string, timeZone: string, startHour: number): boolean => {
+  const range = tvDayRange(key, timeZone, startHour);
+  return Date.parse(programme.start) < range.end && Date.parse(programme.stop) > range.start;
+};
+
 /** Remembers which poster URLs failed to load, so the view shows the placeholder instead. */
-export class BrokenPosters implements ReactiveController {
+export class BrokenPosters {
   private readonly urls = new Set<string>();
 
-  constructor(private readonly host: ReactiveControllerHost) {
-    host.addController(this);
-  }
-
-  hostConnected(): void {}
+  constructor(private readonly host: ReactiveControllerHost) {}
 
   has(url: string): boolean {
     return this.urls.has(url);
@@ -129,7 +140,7 @@ export const viewStyles = [
       flex: 1;
       overscroll-behavior: contain;
     }
-    .earlier {
+    .text-btn {
       display: block;
       width: 100%;
       padding: 10px 16px;
