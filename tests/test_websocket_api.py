@@ -1,3 +1,4 @@
+import dataclasses
 from datetime import datetime
 from typing import Any
 
@@ -85,6 +86,18 @@ async def test_channels_sorted_by_name(ws, loaded_entry) -> None:
     msg = await call(ws, "channels")
     assert [c["id"] for c in msg["result"]] == ["Polsat", "TVN"]
     assert msg["result"][1] == {"id": "TVN", "name": "TVN", "icon": "http://img.example/tvn.png"}
+
+
+async def test_channels_sorted_ignoring_case(hass, ws, loaded_entry) -> None:
+    """A lower case name sorts with the others, not after all capitals."""
+    coordinator = loaded_entry.runtime_data
+    tvn = coordinator.data.channels["TVN"]
+    coordinator.data.channels["TVN"] = dataclasses.replace(tvn, name="tvn")
+    msg = await call(ws, "channels")
+    assert [c["name"] for c in msg["result"]] == ["Polsat", "tvn"]
+    coordinator.data.channels["Polsat"] = dataclasses.replace(coordinator.data.channels["Polsat"], name="Zebra")
+    msg = await call(ws, "channels")
+    assert [c["name"] for c in msg["result"]] == ["tvn", "Zebra"]
 
 
 async def test_info(ws, loaded_entry) -> None:

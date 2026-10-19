@@ -122,7 +122,7 @@ async def ws_channels(
     coordinator: TvGuideCoordinator,
 ) -> None:
     """Send the selected channels, sorted by name."""
-    channels = sorted(coordinator.data.channels.values(), key=lambda c: c.name)
+    channels = sorted(coordinator.data.channels.values(), key=lambda c: c.name.casefold())
     connection.send_result(msg["id"], [channel_to_json(c) for c in channels])
 
 
