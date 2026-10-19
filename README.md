@@ -90,6 +90,15 @@ switch_action:
 - Channel logos from the guide are loaded by the browser straight from the server of the guide. If your Home Assistant uses https (for example Nabu Casa), the browser can block a plain `http` logo. For a safe and better look, set `logo` for each channel in the card config.
 - Use only a guide source you trust. The integration downloads the guide and the poster pictures that the guide points to.
 
+## Data and images
+
+This project contains code only. It has no guide data, posters or logos, and it does not share them.
+
+- You choose the guide source. The guide data, the posters and the logos belong to their owners (the guide provider, broadcasters, picture agencies). Follow the terms of the source you use.
+- The integration downloads the guide to your own Home Assistant. It downloads a poster only when someone opens it, keeps a small copy for your Home Assistant only, and deletes copies not used for 7 days.
+- The poster address works without a login, because an `<img>` tag cannot send a token. It serves only posters of the guide you loaded, under ids that cannot be guessed. Do not use the integration to give the guide or the posters to other people.
+- The built card includes [Lit](https://lit.dev) (BSD-3-Clause). Its licence text is in `frontend/THIRD_PARTY_LICENSES.md` in the release zip.
+
 ## Development
 
 Requirements: Python 3.14.2+ (the version Home Assistant 2026.10 needs), [uv](https://docs.astral.sh/uv/), Node.js 22+, [pnpm](https://pnpm.io).
@@ -110,6 +119,7 @@ To try it in a Home Assistant instance, build the card, then copy or link `custo
 ```
 custom_components/tv_guide/   integration (Python)
   frontend/tv-guide.js        built card (build output)
+  frontend/THIRD_PARTY_LICENSES.md  licences of the bundled packages (build output)
 tests/                        integration tests (pytest)
 frontend/                     card source (TypeScript, Lit, Vite, Vitest)
 docs/
