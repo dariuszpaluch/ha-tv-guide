@@ -132,7 +132,7 @@ sections:
 - Delivery: a notify service from the config (e.g. `notify.mobile_app_<phone>`) and an event `tv_guide_reminder` for own automations.
 - Moved programmes: after each guide refresh, find the same programme (same channel and title, near the old start) and move the timer; if it is gone, notify that it was removed.
 - Later: "Switch" button in the notification (the switch action must then move from the card config to the integration), poster in the notification (needs an external URL), list of reminders in the card.
-- Estimate: basic version 1-2 days with tests; the rest about the same again.
+- Size: the basic version is about three plan tasks (integration store and timers, WebSocket commands, bell in the card), each with tests; the later items about the same again.
 
 ## Decided
 
