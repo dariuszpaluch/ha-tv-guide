@@ -101,13 +101,13 @@ describe('SearchRunner', () => {
     expect(last()).toMatchObject({ now: [], later: [fakty] });
   });
 
-  test('asks the server for both steps with the config channels and the later limit', () => {
+  test('asks the server for both steps with the config channels and the limits', () => {
     const search = vi.fn<Search>(() => new Promise(() => {}));
     const { runner } = setup(search);
 
     runner.run('  Życie ', config);
     expect(search).toHaveBeenCalledTimes(2);
-    expect(search).toHaveBeenCalledWith('zycie', ['TVP 1', 'Polsat', 'TVN'], 'now');
+    expect(search).toHaveBeenCalledWith('zycie', ['TVP 1', 'Polsat', 'TVN'], 'now', 100);
     expect(search).toHaveBeenCalledWith('zycie', ['TVP 1', 'Polsat', 'TVN'], 'later', 40);
   });
 
