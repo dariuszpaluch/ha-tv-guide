@@ -6,7 +6,6 @@ import unicodedata
 from bisect import bisect_left, bisect_right
 from collections.abc import Callable
 from datetime import datetime, timedelta
-from itertools import islice
 
 from .model import Guide, Programme
 
@@ -29,6 +28,7 @@ def schedule(guide: Guide, channel_id: str, start: datetime, end: datetime) -> l
     """Programmes of a channel that overlap `[start, end)`, sorted by start."""
     items = guide.programmes.get(channel_id, [])
     # The programme on air at `start` begins before it, so step one back from the first later one.
+    # Same assumption as `_on_air`: only that one programme can overlap `start`.
     first = max(bisect_right(items, start, key=_start) - 1, 0)
     last = bisect_left(items, end, key=_start)
     return [p for p in items[first:last] if p.stop > start]
@@ -64,14 +64,18 @@ def airings(guide: Guide, programme_id: str, channel_ids: list[str], now: dateti
     if programme is None or programme.stop - programme.start < AIRINGS_MIN_DURATION:
         return []
     title = normalize(programme.title)
+
+    def same_title(channel_id: str) -> list[Programme]:
+        return [
+            p
+            for p in _after(guide.programmes.get(channel_id, []), now)
+            if p.id != programme.id and normalize(p.title) == title
+        ]
+
     other_channels = (c for c in dict.fromkeys(channel_ids) if c != programme.channel_id)
-    found = (
-        p
-        for channel_id in (programme.channel_id, *other_channels)
-        for p in _after(guide.programmes.get(channel_id, []), now)
-        if p.id != programme.id and normalize(p.title) == title
-    )
-    return list(islice(found, limit))
+    # Stable sort: channels earlier in `channel_ids` win a tie.
+    others = sorted((p for c in other_channels for p in same_title(c)), key=_start)
+    return [*same_title(programme.channel_id), *others][:limit]
 
 
 def _start(programme: Programme) -> datetime:
@@ -79,6 +83,7 @@ def _start(programme: Programme) -> datetime:
 
 
 def _on_air(items: list[Programme], now: datetime) -> Programme | None:
+    # Assumes only the programme just before `now` can still run. A guide with deeper overlap is broken anyway.
     index = bisect_right(items, now, key=_start)
     if index == 0 or items[index - 1].stop <= now:
         return None

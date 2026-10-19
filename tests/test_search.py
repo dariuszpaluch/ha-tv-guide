@@ -1,3 +1,4 @@
+from dataclasses import replace
 from datetime import datetime, timedelta
 
 from custom_components.tv_guide.search import (
@@ -101,3 +102,13 @@ def test_airings_none_for_short_programme(guide):
 
 def test_airings_unknown_programme(guide):
     assert airings(guide, "TVN|2000-01-01T00:00:00Z", ["TVN"], NOW, 20) == []
+
+
+def test_airings_other_channels_sorted_by_start(guide):
+    base = guide.programmes["TVN"][0]
+    late = replace(base, channel_id="A", start=base.start + timedelta(days=3), stop=base.stop + timedelta(days=3))
+    soon = replace(base, channel_id="B", start=base.start + timedelta(days=2), stop=base.stop + timedelta(days=2))
+    guide.programmes.update({"A": [late], "B": [soon]})
+    result = airings(guide, base.id, ["A", "B"], NOW, 3)
+    assert [(p.channel_id, p.start.day) for p in result] == [("TVN", 20), ("TVN", 21), ("B", 21)]
+    assert [p.channel_id for p in airings(guide, base.id, ["A", "B"], NOW, 20)][2:] == ["B", "A"]
