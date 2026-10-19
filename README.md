@@ -118,6 +118,7 @@ This project contains code only. It has no guide data, posters or logos, and it 
 - You choose the guide source. The guide data, the posters and the logos belong to their owners (the guide provider, broadcasters, picture agencies). Follow the terms of the source you use.
 - The integration downloads the guide to your own Home Assistant. It downloads a poster only when someone opens it, keeps a small copy for your Home Assistant only, and deletes copies not used for 7 days.
 - The poster address works without a login, because an `<img>` tag cannot send a token. It serves only posters of the guide you loaded, under ids that cannot be guessed. Do not use the integration to give the guide or the posters to other people.
+- The integration downloads posters from any address the guide names, also inside your network. Use a guide source you trust.
 - The built card includes [Lit](https://lit.dev) (BSD-3-Clause). Its licence text is in `frontend/THIRD_PARTY_LICENSES.md` in the release zip.
 
 ## Development
