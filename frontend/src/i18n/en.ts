@@ -1,0 +1,40 @@
+export const en = {
+  search: 'Search channel or programme',
+  clear: 'Clear',
+  channels: 'Channels',
+  onNow: 'On now',
+  later: 'Later',
+  searching: 'Searching…',
+  noMatch: (q: string) => `No channel or programme matches "${q}".`,
+  noGuide: 'No guide',
+  noGuideLong: 'No programme guide for this channel.',
+  until: (time: string) => `until ${time}`,
+  left: (d: string) => `${d} left`,
+  in: (d: string) => `In ${d}`,
+  ended: 'Ended',
+  hours: (h: number, m: number) => `${h} h ${m} min`,
+  minutes: (m: number) => `${m} min`,
+  today: 'Today',
+  tomorrow: 'Tomorrow',
+  earlier: (n: number) => `Show ${n} earlier`,
+  switchTo: (n: number) => `Switch to ${n}`,
+  switching: (n: number, name: string) => `Switching to ${n} ${name}`,
+  moreAirings: 'More airings',
+  showAll: (n: number) => `Show all (${n})`,
+  onChannel: (name: string) => `On ${name}`,
+  onOtherChannels: 'On other channels',
+  close: 'Close',
+  back: 'Back to the schedule',
+  details: (name: string) => `Details for ${name}`,
+  day: 'Day',
+  sheet: 'Channel details',
+  notLoaded: 'The guide is not loaded yet.',
+  notSetUp: 'Add the TV guide integration first.',
+  staleGuide: (when: string) => `Guide from ${when}`,
+  switchFailed: (name: string, error: string) => `Cannot switch to ${name}: ${error}`,
+} as const;
+
+/** Shape of a translation table: same keys as `en`, with plain `string` instead of the English literals. */
+export type Strings = {
+  [K in keyof typeof en]: (typeof en)[K] extends (...args: infer A) => string ? (...args: A) => string : string;
+};
