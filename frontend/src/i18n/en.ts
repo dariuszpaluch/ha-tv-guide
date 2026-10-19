@@ -5,6 +5,7 @@ export const en = {
   onNow: 'On now',
   later: 'Later',
   searching: 'Searching…',
+  loading: 'Loading…',
   noMatch: (q: string) => `No channel or programme matches "${q}".`,
   noGuide: 'No guide',
   noGuideLong: 'No programme guide for this channel.',

@@ -7,6 +7,7 @@ export const pl: Strings = {
   onNow: 'Teraz w TV',
   later: 'Później',
   searching: 'Szukam…',
+  loading: 'Wczytuję…',
   noMatch: (q) => `Brak kanałów i programów dla „${q}”.`,
   noGuide: 'Brak programu',
   noGuideLong: 'Brak programu dla tego kanału.',
