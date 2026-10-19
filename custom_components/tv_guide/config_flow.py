@@ -33,9 +33,14 @@ MIN_UPDATE_INTERVAL = 1
 MAX_UPDATE_INTERVAL = 48
 
 
+def _channel_label(cid: str, name: str) -> str:
+    """The display name, plus the guide id when it differs: the card config needs that id."""
+    return name if name == cid else f"{name} (id: {cid})"
+
+
 def _channel_selector(names: Mapping[str, str]) -> SelectSelector:
     """Multiple choice of channels, sorted by name."""
-    options = [SelectOptionDict(value=cid, label=name) for cid, name in names.items()]
+    options = [SelectOptionDict(value=cid, label=_channel_label(cid, name)) for cid, name in names.items()]
     options.sort(key=lambda option: option["label"].casefold())
     return SelectSelector(SelectSelectorConfig(options=options, multiple=True))
 

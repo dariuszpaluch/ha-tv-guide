@@ -245,6 +245,23 @@ test('a failed schedule shows the load error, not the "no guide" text', async ()
   expect($($(el.shadowRoot, 'tvg-channel-view')?.shadowRoot, '.no-guide')?.textContent).toBe('Cannot load the guide. Trying again soon.');
 });
 
+test('a channel whose guide id the integration does not keep says it is not selected', async () => {
+  const config = {
+    ...CONFIG,
+    sections: [{ channels: [{ number: 7, name: 'TVP 2', epg_id: 'TVP 2' }, { number: 5, name: 'TVN', epg_id: 'TVN' }] }],
+  };
+  const { el } = await mount(makeHass(), config);
+  const row = rowOf(el, 7);
+  expect($(row?.shadowRoot, '.now .title')?.textContent).toBe('Not selected in the integration');
+  expect($(rowOf(el, 5)?.shadowRoot, '.now .title')?.textContent).toBe('Fakty');
+
+  $<HTMLElement>(row?.shadowRoot, '.info')?.click();
+  await settle(el);
+  expect($($(el.shadowRoot, 'tvg-channel-view')?.shadowRoot, '.no-guide')?.textContent).toBe(
+    'This channel is not selected in the TV guide integration. Select it in the integration options.',
+  );
+});
+
 test('the older schedule answer is dropped when another channel was opened meanwhile', async () => {
   const { el, server } = await mount();
   server.hold.add('tv_guide/schedule');

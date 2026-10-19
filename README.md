@@ -63,6 +63,17 @@ sections:
 | `tv_day_starts_at` | `5` | Hour when a TV day starts. Programmes after midnight belong to the evening before. |
 | `height` | `600px` | Height of the whole card frame: the search box and the list. |
 
+#### Your channel list
+
+The channels are in two places: the integration keeps the guide of the channels you tick, and the card lists them with the numbers of your box. Both use the same guide id (`epg_id`).
+
+1. Start from [examples/card.yaml](examples/card.yaml). It has about 40 popular channels of the Polish guide [epg.ovh](https://epg.ovh) with the right ids.
+2. Change `number` to the numbers of your box and delete the channels you do not have.
+3. In the integration options, tick the same channels.
+4. Add the card: edit a dashboard, add a card, choose "Manual" and paste the file.
+
+To add a channel that is not in the example, tick it in the integration options and copy its guide id into the card. The list shows `Name (id: ...)` when the id is not the same as the name. A channel that is in the card but not ticked in the integration shows "Not selected in the integration".
+
 #### Switch action
 
 `switch_action` takes `perform_action` and `data`. Put the entity in `data`, as `entity_id`. The `target:` key is not supported. For a remote or a media player:
@@ -121,6 +132,7 @@ custom_components/tv_guide/   integration (Python)
   frontend/tv-guide.js        built card (build output)
   frontend/THIRD_PARTY_LICENSES.md  licences of the bundled packages (build output)
 tests/                        integration tests (pytest)
+examples/card.yaml            card config to start from
 frontend/                     card source (TypeScript, Lit, Vite, Vitest)
 docs/
   design.md                   what it does and why

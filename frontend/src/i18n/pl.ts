@@ -11,6 +11,8 @@ export const pl: Strings = {
   noMatch: (q) => `Brak kanałów i programów dla „${q}”.`,
   noGuide: 'Brak programu',
   noGuideLong: 'Brak programu dla tego kanału.',
+  notSelected: 'Nie wybrany w integracji',
+  notSelectedLong: 'Ten kanał nie jest wybrany w integracji TV guide. Zaznacz go w opcjach integracji.',
   until: (time) => `do ${time}`,
   left: (d) => `jeszcze ${d}`,
   in: (d) => `Za ${d}`,

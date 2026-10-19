@@ -1,0 +1,74 @@
+# Template of the TV guide card for the Polish guide https://epg.ovh/pl.gz.
+#
+# How to use it:
+# 1. Change `number` to the channel numbers of your box. Delete the channels you do not have.
+# 2. In Home Assistant, open the TV guide integration options and tick the same channels.
+#    The `epg_id` values below are the ids from that list.
+# 3. Edit a dashboard, add a card, choose "Manual" and paste this file.
+#
+# A channel not ticked in the integration shows "Not selected in the integration".
+# To add a channel that is not here, tick it in the integration and copy its id: the list shows
+# "Name (id: ...)" when the id is not the same as the name.
+
+type: custom:tv-guide
+switch_action:
+  # Your own action that switches the box. {number} becomes the channel number.
+  perform_action: script.cable_box_go_to_channel
+  data:
+    channel: "{number}"
+sections:
+  - title: Main
+    channels:
+      - { number: 1, name: TVP 1, epg_id: TVP 1 }
+      - { number: 2, name: TVP 2, epg_id: TVP 2 }
+      - { number: 3, name: Polsat, epg_id: Polsat }
+      - { number: 4, name: TVN, epg_id: TVN }
+      - { number: 5, name: TV 4, epg_id: TV 4 }
+      - { number: 6, name: TV Puls, epg_id: TV Puls }
+      - { number: 7, name: TVN 7, epg_id: TVN 7 }
+      - { number: 8, name: TVP 3, epg_id: TVP 3 }
+      - { number: 9, name: TV 6, epg_id: TV 6 }
+      - { number: 10, name: Puls 2, epg_id: Puls 2 }
+      - { number: 11, name: Super Polsat, epg_id: Super Polsat }
+      - { number: 12, name: TTV, epg_id: TTV }
+      - { number: 13, name: Stopklatka TV, epg_id: Stopklatka TV }
+      - { number: 14, name: Metro, epg_id: METRO }
+      - { number: 15, name: Zoom TV, epg_id: ZOOM TV }
+      - { number: 16, name: Nowa TV, epg_id: NOWA TV }
+      - { number: 17, name: WP, epg_id: WP }
+      - { number: 18, name: Fokus TV, epg_id: Fokus TV }
+  - title: News
+    channels:
+      - { number: 20, name: TVN 24, epg_id: TVN 24 }
+      - { number: 21, name: Polsat News, epg_id: Polsat News }
+      - { number: 22, name: TVP Info, epg_id: TVP Info }
+      - { number: 23, name: TVN 24 BiS, epg_id: TVN 24 BiS }
+  - title: Sport
+    channels:
+      - { number: 30, name: TVP Sport, epg_id: TVP Sport }
+      - { number: 31, name: Polsat Sport 1, epg_id: Polsat Sport 1 }
+      - { number: 32, name: Eurosport, epg_id: Eurosport }
+      - { number: 33, name: Eurosport 2, epg_id: Eurosport 2 }
+      - { number: 34, name: Canal+ Sport, epg_id: Canal+ Sport }
+  - title: Films and series
+    channels:
+      - { number: 40, name: Polsat Film, epg_id: Polsat Film }
+      - { number: 41, name: TVP Seriale, epg_id: TVP Seriale }
+      - { number: 42, name: Kino Polska, epg_id: Kino Polska }
+      - { number: 43, name: HBO, epg_id: HBO }
+      - { number: 44, name: Canal+ Premium, epg_id: Canal+ Premium }
+  - title: Documentary and lifestyle
+    channels:
+      - { number: 50, name: TVP Kultura, epg_id: TVP Kultura }
+      - { number: 51, name: TVP Historia, epg_id: TVP Historia }
+      - { number: 52, name: TVP Dokument, epg_id: TVP Dokument }
+      - { number: 53, name: Discovery Channel, epg_id: Discovery Channel }
+      - { number: 54, name: National Geographic, epg_id: National Geographic Channel }
+      - { number: 55, name: TVN Style, epg_id: TVN Style }
+      - { number: 56, name: TVN Turbo, epg_id: TVN Turbo }
+  - title: Kids
+    channels:
+      - { number: 60, name: TVP ABC, epg_id: TVP ABC }
+      - { number: 61, name: Disney Channel, epg_id: Disney Channel }
+      - { number: 62, name: Cartoon Network, epg_id: Cartoon Network }
+      - { number: 63, name: Nickelodeon, epg_id: Nickelodeon }
