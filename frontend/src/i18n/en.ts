@@ -5,6 +5,7 @@ export const en = {
   onNow: 'On now',
   later: 'Later',
   searching: 'Searching…',
+  loading: 'Loading…',
   noMatch: (q: string) => `No channel or programme matches "${q}".`,
   noGuide: 'No guide',
   noGuideLong: 'No programme guide for this channel.',
@@ -30,6 +31,8 @@ export const en = {
   sheet: 'Channel details',
   notLoaded: 'The guide is not loaded yet.',
   notSetUp: 'Add the TV guide integration first.',
+  loadFailed: 'Cannot load the guide. Trying again soon.',
+  cardDescription: 'TV guide: what is on now, the schedule, search and channel switching.',
   staleGuide: (when: string) => `Guide from ${when}`,
   switchFailed: (name: string, error: string) => `Cannot switch to ${name}: ${error}`,
 } as const;

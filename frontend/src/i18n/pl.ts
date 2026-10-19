@@ -7,6 +7,7 @@ export const pl: Strings = {
   onNow: 'Teraz w TV',
   later: 'Później',
   searching: 'Szukam…',
+  loading: 'Wczytuję…',
   noMatch: (q) => `Brak kanałów i programów dla „${q}”.`,
   noGuide: 'Brak programu',
   noGuideLong: 'Brak programu dla tego kanału.',
@@ -32,6 +33,8 @@ export const pl: Strings = {
   sheet: 'Szczegóły kanału',
   notLoaded: 'Ramówka nie jest jeszcze wczytana.',
   notSetUp: 'Najpierw dodaj integrację TV guide.',
+  loadFailed: 'Nie można wczytać ramówki. Spróbuję za chwilę.',
+  cardDescription: 'Ramówka TV: co jest teraz, program na kolejne dni, szukanie i przełączanie kanałów.',
   staleGuide: (when) => `Ramówka z ${when}`,
   switchFailed: (name, error) => `Nie można przełączyć na ${name}: ${error}`,
 };
