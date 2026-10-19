@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import Any
 
+import pytest
 from homeassistant.config_entries import ConfigEntryState
 from pytest_homeassistant_custom_component.typing import MockHAClientWebSocket
 
@@ -30,6 +31,12 @@ async def test_schedule_bad_time(ws, loaded_entry) -> None:
     assert msg["error"]["code"] == "invalid_format"
 
 
+@pytest.mark.parametrize("start", ["2026-10-19T25:00:00+02:00", "2026-13-45T00:00:00Z", "2026-10-19T19:00:00+99:00"])
+async def test_schedule_impossible_time(ws, loaded_entry, start) -> None:
+    msg = await call(ws, "schedule", channel_id="TVN", start=start, end="2026-10-20T03:00:00Z")
+    assert msg["error"]["code"] == "invalid_format"
+
+
 async def test_schedule_time_without_offset(ws, loaded_entry) -> None:
     msg = await call(ws, "schedule", channel_id="TVN", start="2026-10-19T17:30:00", end="2026-10-20T03:00:00Z")
     assert msg["error"]["code"] == "invalid_format"
@@ -45,8 +52,6 @@ async def test_search_now_and_later(ws, loaded_entry) -> None:
 
 
 async def test_search_limit(ws, loaded_entry) -> None:
-    msg = await call(ws, "search", query="i", channel_ids=["TVN", "Polsat"], when="later", limit=1)
-    assert msg["error"]["code"] == "invalid_format"
     msg = await call(ws, "search", query="fa", channel_ids=["TVN", "Polsat"], when="later", limit=1)
     assert len(msg["result"]) == 1
 

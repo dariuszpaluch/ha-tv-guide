@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
+from datetime import datetime
 from functools import wraps
 from typing import Any
 
@@ -51,6 +52,20 @@ def get_coordinator(hass: HomeAssistant, entry_id: str | None) -> TvGuideCoordin
     if entry.state is not ConfigEntryState.LOADED:
         raise GuideNotLoaded(entry.entry_id)
     return entry.runtime_data
+
+
+def _parse_time(value: str) -> datetime | None:
+    """Parse an ISO 8601 time with an offset. Return None for anything else.
+
+    `parse_datetime` returns None for text that is not a time, but it raises `ValueError`
+    for well-formed text with impossible values, such as hour 25. A time without an offset
+    is ambiguous. The card always sends one.
+    """
+    try:
+        parsed = dt_util.parse_datetime(value)
+    except ValueError:
+        return None
+    return parsed if parsed and parsed.tzinfo else None
 
 
 def async_register_commands(hass: HomeAssistant) -> None:
@@ -145,9 +160,8 @@ async def ws_schedule(
     coordinator: TvGuideCoordinator,
 ) -> None:
     """Send the programmes of a channel that overlap the time range."""
-    start, end = dt_util.parse_datetime(msg["start"]), dt_util.parse_datetime(msg["end"])
-    # A time without an offset is ambiguous. The card always sends one.
-    if start is None or end is None or start.tzinfo is None or end.tzinfo is None:
+    start, end = _parse_time(msg["start"]), _parse_time(msg["end"])
+    if start is None or end is None:
         connection.send_error(
             msg["id"], websocket_api.ERR_INVALID_FORMAT, "start and end need ISO 8601 times with an offset"
         )
