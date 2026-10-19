@@ -61,22 +61,25 @@ def parse_guide(stream: IO[bytes], channel_ids: set[str], now: datetime) -> Guid
 
 
 def _elements(stream: IO[bytes], *tags: str) -> Iterator[ET.Element]:
-    """Yield the finished elements with these tags, then free their memory.
+    """Yield the finished direct children of the root with these tags.
 
-    Children of the root are cleared after use. Without that, the root would keep every
-    handled element and the memory would grow with the size of the file.
+    Every direct child of the root is cleared after use, also the ones that are not wanted.
+    Without that, the root would keep them and the memory would grow with the size of the file.
     """
     root: ET.Element | None = None
+    depth = 0
     try:
         for event, element in ET.iterparse(stream, events=("start", "end")):
             if event == "start":
                 root = element if root is None else root
+                depth += 1
                 continue
-            if element.tag not in tags:
+            depth -= 1
+            if depth != 1:
                 continue
-            yield element
-            if root is not None:
-                root.clear()
+            if element.tag in tags:
+                yield element
+            root.clear()
     except ET.ParseError as error:
         raise ParseError(f"Invalid XMLTV: {error}") from error
 
