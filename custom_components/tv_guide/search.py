@@ -12,11 +12,16 @@ from .model import Guide, Programme
 AIRINGS_MIN_DURATION = timedelta(minutes=15)
 
 
+# Letters that NFKD does not split into a base letter and a mark ("Title matching" in docs/api.md).
+# The card has the same table in frontend/src/utils/normalize.ts.
+_FOLD = str.maketrans({"ł": "l", "ß": "ss", "ı": "i", "ø": "o", "đ": "d", "æ": "ae", "œ": "oe"})
+
+
 def normalize(text: str) -> str:
-    """Text for matching: lower case, no diacritics (`ł` too), no outer whitespace."""
+    """Text for matching: lower case, no diacritics, a few letters folded, no outer whitespace."""
     decomposed = unicodedata.normalize("NFKD", text.lower())
     without_marks = "".join(c for c in decomposed if not unicodedata.combining(c))
-    return without_marks.replace("ł", "l").strip()
+    return without_marks.translate(_FOLD).strip()
 
 
 def now_on_air(guide: Guide, channel_ids: list[str], now: datetime) -> dict[str, Programme | None]:

@@ -22,6 +22,7 @@ describe('splitMatch', () => {
     // "ﬁ" (one ligature character) becomes "fi" (two characters).
     expect(splitMatch('ﬁlm noir', 'noir')).toEqual({ before: 'ﬁlm ', match: 'noir', after: '' });
     expect(splitMatch('ﬁlm noir', 'fi')).toEqual({ before: '', match: 'ﬁ', after: 'lm noir' });
+    expect(splitMatch('Die Straße', 'strasse')).toEqual({ before: 'Die ', match: 'Straße', after: '' });
   });
 
   test('keeps a combining mark inside the match', () => {
