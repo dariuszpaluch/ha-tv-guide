@@ -58,6 +58,20 @@ describe('validateConfig', () => {
     expect(() => validateConfig({ ...baseConfig(), foo: 1 })).toThrow('tv-guide: unknown key "foo"');
   });
 
+  test('ignores the keys that HA and add-ons write into a card config', () => {
+    const extras = {
+      grid_options: { columns: 12, rows: 6 },
+      layout_options: { grid_columns: 4 },
+      view_layout: { column: 2 },
+      visibility: [{ condition: 'state', entity: 'light.tv', state: 'on' }],
+      disabled: false,
+      card_mod: { style: 'ha-card { color: red; }' },
+    };
+    const config = validateConfig({ ...baseConfig(), ...extras });
+    for (const key of Object.keys(extras)) expect(config).not.toHaveProperty(key);
+    expect(() => validateConfig({ ...baseConfig(), grid_options: 'any shape', visibility: 1 })).not.toThrow();
+  });
+
   test('rejects an unknown key in a section and in a channel', () => {
     expect(() => validateConfig({ ...baseConfig(), sections: [{ channels: [], colour: 'red' }] })).toThrow('"colour"');
     expect(() => validateConfig(withChannels({ ...tvp1, id: 'x' }))).toThrow('"id"');

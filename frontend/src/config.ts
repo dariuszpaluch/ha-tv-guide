@@ -52,6 +52,12 @@ const DEFAULT_HEIGHT = '600px';
 const LAST_HOUR_OF_DAY = 23;
 const NUMBER_PLACEHOLDER = '{number}';
 
+/**
+ * Keys that HA and common add-ons write into any card config (layout, visibility, card-mod).
+ * The card ignores them and does not check their shape.
+ */
+const HOST_KEYS = ['grid_options', 'layout_options', 'view_layout', 'visibility', 'disabled', 'card_mod'] as const;
+
 const LOGO_TILES: readonly LogoTile[] = ['dark', 'light'];
 
 type Dict = Record<string, unknown>;
@@ -182,7 +188,11 @@ const validateSwitchAction = (raw: unknown): SwitchAction => {
  */
 export const validateConfig = (raw: unknown): TvGuideConfig => {
   if (!isRecord(raw)) throw configError('', 'the card config must be an object');
-  assertKnownKeys(raw, ['type', 'entry_id', 'switch_action', 'tv_day_starts_at', 'height', 'sections'], '');
+  assertKnownKeys(
+    raw,
+    ['type', 'entry_id', 'switch_action', 'tv_day_starts_at', 'height', 'sections', ...HOST_KEYS],
+    '',
+  );
   const switchAction = validateSwitchAction(raw.switch_action);
   const sections = requiredList(raw, 'sections', '').map(validateSection);
 
