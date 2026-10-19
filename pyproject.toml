@@ -7,6 +7,7 @@ dependencies = []
 
 [dependency-groups]
 dev = [
+  "home-assistant-frontend==20260930.4",
   "pytest-homeassistant-custom-component==0.13.373",
   "ruff",
 ]

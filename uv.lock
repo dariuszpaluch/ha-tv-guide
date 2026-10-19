@@ -1132,6 +1132,7 @@ source = { virtual = "." }
 
 [package.dev-dependencies]
 dev = [
+    { name = "home-assistant-frontend" },
     { name = "pytest-homeassistant-custom-component" },
     { name = "ruff" },
 ]
@@ -1140,6 +1141,7 @@ dev = [
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "home-assistant-frontend", specifier = "==20260930.4" },
     { name = "pytest-homeassistant-custom-component", specifier = "==0.13.373" },
     { name = "ruff" },
 ]
@@ -1232,6 +1234,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/bc/6f/914fd8086f502748907751766e26e3f7fe5204347a679703ee9954e55e4d/home_assistant_bluetooth-2.0.0.tar.gz", hash = "sha256:3febd16b194812b156024d9bc8ce8ec7622cdd8d159047cac504cc77ca034ea1", size = 7604, upload-time = "2025-07-09T18:01:47.541Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/15/3e/2ed9e59da8fc26c43cbd9d6abbd27217138a31c608b1d334cc5e680e4069/home_assistant_bluetooth-2.0.0-py3-none-any.whl", hash = "sha256:8d7c2ac48c303adacad73cb6cdfe7710f2fccd2a367d4c3106acf301b0d22b91", size = 7907, upload-time = "2025-07-09T18:01:46.506Z" },
+]
+
+[[package]]
+name = "home-assistant-frontend"
+version = "20260930.4"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/9d/2b/4bcfe71498eb69a4387af9db487d2718692ca695686ffd6befc407a8576e/home_assistant_frontend-20260930.4.tar.gz", hash = "sha256:269d186924e1ab9d5c3992326dac3420d7f0c78d767ee4a14abe4011f68d6b56", size = 109960553, upload-time = "2026-10-16T11:41:03.462Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b4/ea/2074829fb00d53061804eae66303e2900319c348b4a92f239de7a537d6dc/home_assistant_frontend-20260930.4-py3-none-any.whl", hash = "sha256:05c207fb6ce6720d1782766b54a67acdf4bab83f133a562204b972d062862fc8", size = 110732939, upload-time = "2026-10-16T11:40:56.762Z" },
 ]
 
 [[package]]

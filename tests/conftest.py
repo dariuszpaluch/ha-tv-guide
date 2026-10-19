@@ -1,10 +1,8 @@
 """Shared test data. Later tasks add to this file; do not define a second copy."""
 
 import io
-from collections.abc import Iterator
 from datetime import datetime
 from pathlib import Path
-from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -12,6 +10,7 @@ from freezegun.api import FrozenDateTimeFactory
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.setup import async_setup_component
+from PIL import Image
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 from pytest_homeassistant_custom_component.typing import MockHAClientWebSocket, WebSocketGenerator
@@ -30,11 +29,18 @@ def _enable(enable_custom_integrations: None) -> None:
     """Let Home Assistant load the integration from `custom_components`."""
 
 
-@pytest.fixture(autouse=True)
-def _no_frontend() -> Iterator[None]:
-    """The manifest depends on `frontend`. Skip its setup: the `hass_frontend` package is not installed."""
-    with patch("homeassistant.components.frontend.async_setup", return_value=True):
-        yield
+@pytest.fixture
+def hass_config_dir(hass_tmp_config_dir: str) -> str:
+    """Use a temporary config folder: the poster cache writes below it."""
+    return hass_tmp_config_dir
+
+
+@pytest.fixture
+def poster_bytes() -> bytes:
+    """A 1920x1080 JPEG poster, built on the fly."""
+    buffer = io.BytesIO()
+    Image.new("RGB", (1920, 1080), (200, 30, 30)).save(buffer, "JPEG")
+    return buffer.getvalue()
 
 
 @pytest.fixture
