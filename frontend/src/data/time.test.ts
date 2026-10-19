@@ -42,6 +42,12 @@ describe('tvDayKey', () => {
     expect(tvDayKey(Date.parse(nocneKino.start), WAW, 5)).toBe('2026-10-24');
     expect(tvDayKey(Date.parse(poKinie.start), WAW, 5)).toBe('2026-10-24');
   });
+  test('start hour 2 on the DST night: the repeated hour belongs to the day before, in both halves', () => {
+    // Clocks go back at 03:00 CEST. 02:00-03:00 happens twice, and the TV day starts at the second 02:00.
+    expect(tvDayKey(Date.parse('2026-10-25T00:30:00Z'), WAW, 2)).toBe('2026-10-24');
+    expect(tvDayKey(Date.parse('2026-10-25T00:59:59.999Z'), WAW, 2)).toBe('2026-10-24');
+    expect(tvDayKey(Date.parse('2026-10-25T01:00:00Z'), WAW, 2)).toBe('2026-10-25');
+  });
   test('start hour 0 gives the calendar day', () => {
     expect(tvDayKey(Date.parse('2026-10-20T00:10:00+02:00'), WAW, 0)).toBe('2026-10-20');
   });
@@ -66,6 +72,15 @@ describe('tvDayRange', () => {
     expect(tvDayKey(start, WAW, 5)).toBe('2026-10-24');
     expect(tvDayKey(end - 1, WAW, 5)).toBe('2026-10-24');
     expect(tvDayKey(end, WAW, 5)).toBe('2026-10-25');
+  });
+});
+
+describe('tvDayKey and tvDayRange for every start hour', () => {
+  test.each([0, 1, 2, 3, 4, 5, 12, 23])('key matches range at start hour %i on the DST days', (startHour) => {
+    for (const day of ['2026-03-28', '2026-03-29', '2026-10-24', '2026-10-25']) {
+      const { start, end } = tvDayRange(day, WAW, startHour);
+      for (let ms = start; ms < end; ms += 15 * 60e3) expect(tvDayKey(ms, WAW, startHour)).toBe(day);
+    }
   });
 });
 
