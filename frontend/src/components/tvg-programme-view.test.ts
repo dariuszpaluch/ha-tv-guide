@@ -51,6 +51,14 @@ test('shows the chips: category, age, year, countries and star rating', async ()
   expect(text($(el, '.meta .age'))).toBe('12+');
 });
 
+test('an age rating that is not a plain number is shown as the source gives it', async () => {
+  for (const rating of ['PG-13', 'TV-14', 'FSK 12', '16+']) {
+    const el = await mount({ programme: { ...zycie, rating }, channel: polsat });
+    expect(text($(el, '.meta .age'))).toBe(rating);
+    el.remove();
+  }
+});
+
 test('shows no chips when the programme has no details', async () => {
   const el = await mount({ programme: uwagaTomorrow });
   expect($(el, '.meta')).toBeNull();
