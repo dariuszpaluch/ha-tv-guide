@@ -1,0 +1,431 @@
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+import { tvDayRange } from './data/time';
+import { NOW, WAW, channels, fakty, faktyDay3, faktyPolsat, faktyTomorrow, mecz, sport, uwagaTomorrow, zycie } from './test/fixtures';
+import type { Programme } from './types/api';
+import type { HomeAssistant } from './types/hass';
+import './tv-guide';
+import { registerCard, type TvGuide } from './tv-guide';
+
+vi.mock('./utils/logo-tone', () => ({ measureLogo: vi.fn(() => 'mixed') }));
+
+const SCHEDULE: Programme[] = [fakty, sport, faktyTomorrow, uwagaTomorrow, faktyDay3, zycie, mecz, faktyPolsat];
+const MINUTE = 60e3;
+const SWITCH_FEEDBACK_MS = 1600;
+
+const CONFIG = {
+  type: 'custom:tv-guide',
+  switch_action: { perform_action: 'script.cable_box_go_to_channel', data: { channel: '{number}' } },
+  sections: [
+    {
+      title: 'Main',
+      channels: [
+        { number: 1, name: 'TVP 1 HD' },
+        { number: 3, name: 'Polsat', epg_id: 'Polsat', logo: '/local/polsat.png' },
+      ],
+    },
+    { title: 'News', channels: [{ number: 5, name: 'TVN', epg_id: 'TVN' }] },
+  ],
+};
+
+/** A guide server that answers like the integration. Tests change `server.fail` and `server.info`. */
+const makeServer = () => {
+  const server = {
+    fail: undefined as { code: string; message: string } | undefined,
+    info: { last_success: '2026-10-19T18:00:00+02:00', update_interval: 12 },
+    search: { now: [fakty] as Programme[], later: [faktyPolsat] as Programme[] },
+    airings: [] as Programme[],
+    send: vi.fn(async (message: Record<string, unknown>): Promise<unknown> => {
+      if (server.fail) throw server.fail;
+      switch (message.type) {
+        case 'tv_guide/info':
+          return server.info;
+        case 'tv_guide/channels':
+          return channels;
+        case 'tv_guide/now':
+          return { Polsat: zycie, TVN: fakty };
+        case 'tv_guide/schedule': {
+          const start = Date.parse(message.start as string);
+          const end = Date.parse(message.end as string);
+          return SCHEDULE.filter(
+            (p) => p.channel_id === message.channel_id && Date.parse(p.start) < end && Date.parse(p.stop) > start,
+          );
+        }
+        case 'tv_guide/search':
+          return message.when === 'now' ? server.search.now : server.search.later;
+        case 'tv_guide/airings':
+          return server.airings;
+        default:
+          throw new Error(`unexpected message ${String(message.type)}`);
+      }
+    }),
+    requests: (type: string) => server.send.mock.calls.map(([message]) => message).filter((message) => message.type === type),
+  };
+  return server;
+};
+
+const makeHass = (server = makeServer(), locale: Partial<HomeAssistant['locale']> = {}) => {
+  const callService = vi.fn(async () => undefined);
+  const hass: HomeAssistant = {
+    connection: { sendMessagePromise: server.send as HomeAssistant['connection']['sendMessagePromise'] },
+    callService,
+    locale: { language: 'en', time_format: 'language', time_zone: 'server', ...locale },
+    config: { time_zone: WAW },
+    themes: { darkMode: false },
+  };
+  return { hass, server, callService };
+};
+
+/** Lets the pending requests finish and the card render. */
+const settle = async (el: TvGuide) => {
+  for (let round = 0; round < 3; round++) await vi.advanceTimersByTimeAsync(0);
+  await el.updateComplete;
+};
+
+const mount = async (setup = makeHass(), config: unknown = CONFIG) => {
+  const el = document.createElement('tv-guide') as TvGuide;
+  el.setConfig(config);
+  el.hass = setup.hass;
+  document.body.append(el);
+  await settle(el);
+  return { el, ...setup };
+};
+
+const $ = <T extends Element>(root: ParentNode | null | undefined, selector: string) => root?.querySelector<T>(selector) ?? null;
+const $$ = <T extends Element>(root: ParentNode | null | undefined, selector: string) => [...(root?.querySelectorAll<T>(selector) ?? [])];
+const rows = (el: TvGuide) => $$<HTMLElement & { channel: { number: number }; programme: Programme | null; logo?: string }>(el.shadowRoot, 'tvg-channel-row');
+const rowOf = (el: TvGuide, number: number) => rows(el).find((row) => row.channel.number === number);
+const text = (el: TvGuide) => el.shadowRoot?.textContent?.replace(/\s+/g, ' ') ?? '';
+const isoRange = (key: string) => {
+  const { start, end } = tvDayRange(key, WAW, 5);
+  return { start: new Date(start).toISOString(), end: new Date(end).toISOString() };
+};
+
+/** Types in the search box the way a user does. */
+const typeQuery = async (el: TvGuide, query: string) => {
+  const input = $<HTMLInputElement>($(el.shadowRoot, 'tvg-search-box')?.shadowRoot, 'input');
+  if (!input) throw new Error('no search input');
+  input.value = query;
+  input.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+  await settle(el);
+  return input;
+};
+
+beforeEach(() => {
+  vi.useFakeTimers({ now: NOW, toFake: ['Date', 'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] });
+});
+
+afterEach(() => {
+  document.body.replaceChildren();
+  vi.useRealTimers();
+});
+
+test('renders sections and rows from now', async () => {
+  const { el } = await mount();
+  expect($$(el.shadowRoot, '.section').map((s) => s.textContent?.trim())).toEqual(['Main', 'News']);
+  expect(rows(el).map((row) => row.channel.number)).toEqual([1, 3, 5]);
+  expect(rowOf(el, 5)?.programme?.title).toBe('Fakty');
+  expect(rowOf(el, 3)?.programme?.title).toBe('Życie na fali');
+  expect(rowOf(el, 1)?.programme).toBeNull();
+});
+
+test('a row uses the guide icon, and the config logo when there is one', async () => {
+  const { el } = await mount();
+  expect(rowOf(el, 5)?.logo).toBe('http://img.example/tvn.png');
+  expect(rowOf(el, 3)?.logo).toBe('/local/polsat.png');
+  expect(rowOf(el, 1)?.logo).toBeUndefined();
+});
+
+test('asks for the channels once and for now every 60 seconds', async () => {
+  const { el, server } = await mount();
+  expect(server.requests('tv_guide/channels')).toHaveLength(1);
+  expect(server.requests('tv_guide/now')).toHaveLength(1);
+  await vi.advanceTimersByTimeAsync(60 * 1000);
+  await settle(el);
+  expect(server.requests('tv_guide/channels')).toHaveLength(1);
+  expect(server.requests('tv_guide/now')).toHaveLength(2);
+});
+
+test('sets the list height from the config', async () => {
+  const { el } = await mount(makeHass(), { ...CONFIG, height: '420px' });
+  expect($<HTMLElement>(el.shadowRoot, '.frame')?.style.height).toBe('420px');
+});
+
+test('tvg-switch calls the switch action and marks the row for 1.6 seconds', async () => {
+  const { el, callService } = await mount();
+  $<HTMLElement>(rowOf(el, 3)?.shadowRoot, '.zap')?.click();
+  await settle(el);
+  expect(callService).toHaveBeenCalledWith('script', 'cable_box_go_to_channel', { channel: 3 });
+  expect($(rowOf(el, 3)?.shadowRoot, '.zap.switching')).not.toBeNull();
+  expect(text(el)).toContain('Switching to 3 Polsat');
+
+  await vi.advanceTimersByTimeAsync(SWITCH_FEEDBACK_MS);
+  await el.updateComplete;
+  expect($(rowOf(el, 3)?.shadowRoot, '.zap.switching')).toBeNull();
+  expect(text(el)).not.toContain('Switching to');
+});
+
+test('a failed switch sends a hass-notification', async () => {
+  const setup = makeHass();
+  setup.callService.mockRejectedValueOnce(new Error('offline'));
+  const { el } = await mount(setup);
+  const onNotification = vi.fn();
+  el.addEventListener('hass-notification', (event) => onNotification((event as CustomEvent).detail));
+  $<HTMLElement>(rowOf(el, 3)?.shadowRoot, '.zap')?.click();
+  await settle(el);
+  expect(onNotification).toHaveBeenCalledWith({ message: 'Cannot switch to Polsat: offline' });
+});
+
+test('opening a channel requests the schedule for the TV day of today', async () => {
+  const { el, server } = await mount();
+  $<HTMLElement>(rowOf(el, 5)?.shadowRoot, '.info')?.click();
+  await settle(el);
+
+  expect(server.requests('tv_guide/schedule')).toContainEqual({
+    type: 'tv_guide/schedule',
+    channel_id: 'TVN',
+    ...isoRange('2026-10-19'),
+  });
+  const view = $<HTMLElement & { programmes: Programme[]; selectedDay: string; days: string[] }>(el.shadowRoot, 'tvg-channel-view');
+  expect(view?.selectedDay).toBe('2026-10-19');
+  expect(view?.programmes.map((p) => p.id)).toEqual([fakty.id, sport.id]);
+  expect(view?.days).toEqual(['2026-10-19', '2026-10-20', '2026-10-21']);
+  expect($<HTMLElement & { open: boolean }>(el.shadowRoot, 'tvg-sheet')?.open).toBe(true);
+});
+
+test('a day chip loads the schedule of that day', async () => {
+  const { el, server } = await mount();
+  $<HTMLElement>(rowOf(el, 5)?.shadowRoot, '.info')?.click();
+  await settle(el);
+  const view = $<HTMLElement & { programmes: Programme[]; selectedDay: string }>(el.shadowRoot, 'tvg-channel-view');
+  const chips = $(view?.shadowRoot, 'tvg-day-chips');
+  const tomorrow = $$<HTMLButtonElement>(chips?.shadowRoot, 'button')[1];
+  tomorrow?.click();
+  await settle(el);
+
+  expect(server.requests('tv_guide/schedule')).toContainEqual({
+    type: 'tv_guide/schedule',
+    channel_id: 'TVN',
+    ...isoRange('2026-10-20'),
+  });
+  expect(view?.selectedDay).toBe('2026-10-20');
+  expect(view?.programmes.map((p) => p.id)).toEqual([faktyTomorrow.id, uwagaTomorrow.id]);
+});
+
+test('a channel without a guide id opens without asking the server', async () => {
+  const { el, server } = await mount();
+  $<HTMLElement>(rowOf(el, 1)?.shadowRoot, '.info')?.click();
+  await settle(el);
+  expect(server.requests('tv_guide/schedule')).toHaveLength(0);
+  expect($<HTMLElement & { loading: boolean }>(el.shadowRoot, 'tvg-channel-view')?.loading).toBe(false);
+});
+
+test('opening a programme requests its airings with the channels of the card', async () => {
+  const { el, server } = await mount();
+  $<HTMLElement>(rowOf(el, 5)?.shadowRoot, '.info')?.click();
+  await settle(el);
+  const view = $(el.shadowRoot, 'tvg-channel-view');
+  $<HTMLElement>(view?.shadowRoot, '.slot')?.click();
+  await settle(el);
+
+  expect(server.requests('tv_guide/airings')).toEqual([
+    { type: 'tv_guide/airings', programme_id: fakty.id, channel_ids: ['Polsat', 'TVN'] },
+  ]);
+  const programmeView = $<HTMLElement & { programme: Programme; airings: Programme[] | null }>(el.shadowRoot, 'tvg-programme-view');
+  expect(programmeView?.programme.id).toBe(fakty.id);
+  expect(programmeView?.airings).toEqual([]);
+  expect($<HTMLElement & { showProgramme: boolean }>(el.shadowRoot, 'tvg-sheet')?.showProgramme).toBe(true);
+});
+
+test('back shows the schedule again and close closes the sheet', async () => {
+  const { el } = await mount();
+  $<HTMLElement>(rowOf(el, 5)?.shadowRoot, '.info')?.click();
+  await settle(el);
+  $<HTMLElement>($(el.shadowRoot, 'tvg-channel-view')?.shadowRoot, '.slot')?.click();
+  await settle(el);
+  const sheet = $<HTMLElement & { open: boolean; showProgramme: boolean }>(el.shadowRoot, 'tvg-sheet');
+
+  $<HTMLElement>($(el.shadowRoot, 'tvg-programme-view')?.shadowRoot, '[data-back]')?.click();
+  await settle(el);
+  expect(sheet?.showProgramme).toBe(false);
+  expect(sheet?.open).toBe(true);
+
+  $<HTMLElement>($(el.shadowRoot, 'tvg-channel-view')?.shadowRoot, '[data-close]')?.click();
+  await settle(el);
+  expect(sheet?.open).toBe(false);
+});
+
+test('a programme from search opens its channel on its day with the programme view', async () => {
+  const { el, server } = await mount();
+  await typeQuery(el, 'fakty');
+  const row = $$<HTMLElement & { programme: Programme | null }>(el.shadowRoot, 'tvg-programme-row').find((r) => r.programme?.id === faktyPolsat.id);
+  $<HTMLElement>(row?.shadowRoot, '.info')?.click();
+  await settle(el);
+
+  expect(server.requests('tv_guide/schedule')).toContainEqual({
+    type: 'tv_guide/schedule',
+    channel_id: 'Polsat',
+    ...isoRange('2026-10-20'),
+  });
+  const view = $<HTMLElement & { selectedDay: string; channel: { number: number } }>(el.shadowRoot, 'tvg-channel-view');
+  expect(view?.channel.number).toBe(3);
+  expect(view?.selectedDay).toBe('2026-10-20');
+  expect($<HTMLElement & { programme: Programme }>(el.shadowRoot, 'tvg-programme-view')?.programme.id).toBe(faktyPolsat.id);
+  expect($<HTMLElement & { showProgramme: boolean }>(el.shadowRoot, 'tvg-sheet')?.showProgramme).toBe(true);
+});
+
+test('a programme from the airings opens the channel and the day of that airing', async () => {
+  const setup = makeHass();
+  setup.server.airings = [faktyPolsat];
+  const { el, server } = await mount(setup);
+  $<HTMLElement>(rowOf(el, 5)?.shadowRoot, '.info')?.click();
+  await settle(el);
+  $<HTMLElement>($(el.shadowRoot, 'tvg-channel-view')?.shadowRoot, '.slot')?.click();
+  await settle(el);
+  const air = $<HTMLElement>($(el.shadowRoot, 'tvg-programme-view')?.shadowRoot, '.air');
+  air?.click();
+  await settle(el);
+
+  const view = $<HTMLElement & { selectedDay: string; channel: { number: number } }>(el.shadowRoot, 'tvg-channel-view');
+  expect(view?.channel.number).toBe(3);
+  expect(view?.selectedDay).toBe('2026-10-20');
+  expect($<HTMLElement & { programme: Programme }>(el.shadowRoot, 'tvg-programme-view')?.programme.id).toBe(faktyPolsat.id);
+  expect(server.requests('tv_guide/airings')).toContainEqual({
+    type: 'tv_guide/airings',
+    programme_id: faktyPolsat.id,
+    channel_ids: ['Polsat', 'TVN'],
+  });
+});
+
+test('Enter in the search box switches to the first result', async () => {
+  const { el, callService } = await mount();
+  const input = await typeQuery(el, 'tvn');
+  input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, composed: true }));
+  await settle(el);
+  expect(callService).toHaveBeenCalledWith('script', 'cable_box_go_to_channel', { channel: 5 });
+});
+
+test('a blank query shows the normal list and a query without matches says so', async () => {
+  const setup = makeHass();
+  setup.server.search = { now: [], later: [] };
+  const { el } = await mount(setup);
+  await typeQuery(el, 'zzz');
+  expect(text(el)).toContain('No channel or programme matches "zzz".');
+  await typeQuery(el, '');
+  expect(rows(el)).toHaveLength(3);
+});
+
+test('shows a stale guide hint', async () => {
+  const setup = makeHass();
+  setup.server.info = { last_success: '2026-10-17T12:30:00+02:00', update_interval: 12 };
+  const { el } = await mount(setup);
+  expect($(el.shadowRoot, '.stale')?.textContent?.trim()).toBe('Guide from 17 Oct, 12:30');
+});
+
+test('shows no hint for a fresh guide', async () => {
+  const { el } = await mount();
+  expect($(el.shadowRoot, '.stale')).toBeNull();
+});
+
+test('with time_format 12 the rows show 12-hour times', async () => {
+  const { el } = await mount(makeHass(makeServer(), { time_format: '12' }));
+  expect(rowOf(el, 5)?.shadowRoot?.textContent).toMatch(/7:35\s*pm/i);
+});
+
+test('with the default time_format the rows show 24-hour times', async () => {
+  const { el } = await mount();
+  expect(rowOf(el, 5)?.shadowRoot?.textContent).toContain('19:35');
+});
+
+test('shows not loaded message for not_loaded', async () => {
+  const setup = makeHass();
+  setup.server.fail = { code: 'not_loaded', message: 'not loaded' };
+  const { el } = await mount(setup);
+  expect($(el.shadowRoot, '.empty')?.textContent?.trim()).toBe('The guide is not loaded yet.');
+  expect(rows(el)).toHaveLength(0);
+});
+
+test('shows the not set up message for not_found', async () => {
+  const setup = makeHass();
+  setup.server.fail = { code: 'not_found', message: 'no entry' };
+  const { el } = await mount(setup);
+  expect($(el.shadowRoot, '.empty')?.textContent?.trim()).toBe('Add the TV guide integration first.');
+});
+
+test('shows a general message for any other error', async () => {
+  const setup = makeHass();
+  setup.server.fail = { code: 'boom', message: 'boom' };
+  const { el } = await mount(setup);
+  expect($(el.shadowRoot, '.empty')?.textContent?.trim()).toBe('Cannot load the guide. Trying again soon.');
+});
+
+test('recovers on the next tick when the integration finishes loading', async () => {
+  const setup = makeHass();
+  setup.server.fail = { code: 'not_loaded', message: 'not loaded' };
+  const { el } = await mount(setup);
+  setup.server.fail = undefined;
+  await vi.advanceTimersByTimeAsync(MINUTE);
+  await settle(el);
+  expect($(el.shadowRoot, '.empty')).toBeNull();
+  expect(rowOf(el, 5)?.programme?.title).toBe('Fakty');
+  expect(rowOf(el, 5)?.logo).toBe('http://img.example/tvn.png');
+});
+
+test('a new hass.connection is used from then on', async () => {
+  const first = makeHass();
+  const { el } = await mount(first);
+  const second = makeHass();
+  el.hass = { ...first.hass, connection: second.hass.connection };
+  await settle(el);
+  expect(second.server.requests('tv_guide/now')).toHaveLength(1);
+  const callsBefore = first.server.send.mock.calls.length;
+  await vi.advanceTimersByTimeAsync(MINUTE);
+  expect(first.server.send.mock.calls.length).toBe(callsBefore);
+  expect(second.server.requests('tv_guide/now')).toHaveLength(2);
+});
+
+test('the same connection in a new hass object sends nothing', async () => {
+  const setup = makeHass();
+  const { el } = await mount(setup);
+  const calls = setup.server.send.mock.calls.length;
+  el.hass = { ...setup.hass };
+  await settle(el);
+  expect(setup.server.send.mock.calls.length).toBe(calls);
+});
+
+test('the refresh timer runs only while the card is connected', async () => {
+  const { el, server } = await mount();
+  el.remove();
+  await vi.advanceTimersByTimeAsync(3 * MINUTE);
+  expect(server.requests('tv_guide/now')).toHaveLength(1);
+
+  document.body.append(el);
+  await settle(el);
+  expect(server.requests('tv_guide/now')).toHaveLength(2);
+  await vi.advanceTimersByTimeAsync(MINUTE);
+  expect(server.requests('tv_guide/now')).toHaveLength(3);
+});
+
+test('setConfig throws the config error', () => {
+  const el = document.createElement('tv-guide') as TvGuide;
+  expect(() => el.setConfig({ type: 'custom:tv-guide', sections: [] })).toThrow(/switch_action/);
+});
+
+test('empty sections give an empty list', async () => {
+  const { el, server } = await mount(makeHass(), { ...CONFIG, sections: [] });
+  expect(rows(el)).toHaveLength(0);
+  expect($(el.shadowRoot, '.empty')).toBeNull();
+  expect(server.requests('tv_guide/now')).toHaveLength(0);
+});
+
+test('getCardSize is 9', () => {
+  expect((document.createElement('tv-guide') as TvGuide).getCardSize()).toBe(9);
+});
+
+test('the card is registered once in window.customCards', () => {
+  registerCard();
+  const cards = (window as unknown as { customCards: { type: string; name: string; description: string }[] }).customCards;
+  const entries = cards.filter((card) => card.type === 'tv-guide');
+  expect(entries).toHaveLength(1);
+  expect(entries[0]?.name).toBe('TV guide');
+  expect(entries[0]?.description).not.toBe('');
+});
