@@ -31,18 +31,29 @@ const CONFIG = {
 const makeServer = () => {
   const server = {
     fail: undefined as { code: string; message: string } | undefined,
+    /** With `fail`: only this message type fails. Empty means all of them. */
+    failType: undefined as string | undefined,
+    /** Message types whose answers wait for `release`. */
+    hold: new Set<string>(),
+    held: [] as { message: Record<string, unknown>; resolve: (answer?: unknown) => void }[],
     info: { last_success: '2026-10-19T18:00:00+02:00', update_interval: 12 },
     search: { now: [fakty] as Programme[], later: [faktyPolsat] as Programme[] },
     airings: [] as Programme[],
+    airingsBy: {} as Record<string, Programme[]>,
+    now: { Polsat: zycie, TVN: fakty } as Record<string, Programme | null>,
     send: vi.fn(async (message: Record<string, unknown>): Promise<unknown> => {
-      if (server.fail) throw server.fail;
+      if (server.fail && (server.failType === undefined || server.failType === message.type)) throw server.fail;
+      if (server.hold.has(message.type as string)) {
+        const answer = await new Promise<unknown>((resolve) => server.held.push({ message, resolve }));
+        if (answer !== undefined) return answer;
+      }
       switch (message.type) {
         case 'tv_guide/info':
           return server.info;
         case 'tv_guide/channels':
           return channels;
         case 'tv_guide/now':
-          return { Polsat: zycie, TVN: fakty };
+          return server.now;
         case 'tv_guide/schedule': {
           const start = Date.parse(message.start as string);
           const end = Date.parse(message.end as string);
@@ -53,11 +64,18 @@ const makeServer = () => {
         case 'tv_guide/search':
           return message.when === 'now' ? server.search.now : server.search.later;
         case 'tv_guide/airings':
-          return server.airings;
+          return server.airingsBy[message.programme_id as string] ?? server.airings;
         default:
           throw new Error(`unexpected message ${String(message.type)}`);
       }
     }),
+    /** The held request of a type that matches `where`; its answer is `answer`, or the normal one. */
+    release: (type: string, where: (message: Record<string, unknown>) => boolean, answer?: unknown, newest = false) => {
+      const matches = (entry: { message: Record<string, unknown> }) => entry.message.type === type && where(entry.message);
+      const index = newest ? server.held.map(matches).lastIndexOf(true) : server.held.findIndex(matches);
+      if (index < 0) throw new Error(`no held ${type} request`);
+      server.held.splice(index, 1)[0]?.resolve(answer);
+    },
     requests: (type: string) => server.send.mock.calls.map(([message]) => message).filter((message) => message.type === type),
   };
   return server;
@@ -175,40 +193,91 @@ test('a failed switch sends a hass-notification', async () => {
   expect(onNotification).toHaveBeenCalledWith({ message: 'Cannot switch to Polsat: offline' });
 });
 
-test('opening a channel requests the schedule for the TV day of today', async () => {
+test('opening a channel sends one schedule request, from the start of today to 14 days ahead', async () => {
   const { el, server } = await mount();
   $<HTMLElement>(rowOf(el, 5)?.shadowRoot, '.info')?.click();
   await settle(el);
 
-  expect(server.requests('tv_guide/schedule')).toContainEqual({
-    type: 'tv_guide/schedule',
-    channel_id: 'TVN',
-    ...isoRange('2026-10-19'),
-  });
+  const start = tvDayRange('2026-10-19', WAW, 5).start;
+  expect(server.requests('tv_guide/schedule')).toEqual([
+    {
+      type: 'tv_guide/schedule',
+      channel_id: 'TVN',
+      start: new Date(start).toISOString(),
+      end: new Date(start + 14 * 24 * 3600e3).toISOString(),
+    },
+  ]);
   const view = $<HTMLElement & { programmes: Programme[]; selectedDay: string; days: string[] }>(el.shadowRoot, 'tvg-channel-view');
   expect(view?.selectedDay).toBe('2026-10-19');
-  expect(view?.programmes.map((p) => p.id)).toEqual([fakty.id, sport.id]);
+  expect(view?.programmes.map((p) => p.id)).toEqual([fakty.id, sport.id, faktyTomorrow.id, uwagaTomorrow.id, faktyDay3.id]);
   expect(view?.days).toEqual(['2026-10-19', '2026-10-20', '2026-10-21']);
   expect($<HTMLElement & { open: boolean }>(el.shadowRoot, 'tvg-sheet')?.open).toBe(true);
 });
 
-test('a day chip loads the schedule of that day', async () => {
+test('a day chip changes the day without a new request', async () => {
   const { el, server } = await mount();
   $<HTMLElement>(rowOf(el, 5)?.shadowRoot, '.info')?.click();
   await settle(el);
-  const view = $<HTMLElement & { programmes: Programme[]; selectedDay: string }>(el.shadowRoot, 'tvg-channel-view');
-  const chips = $(view?.shadowRoot, 'tvg-day-chips');
-  const tomorrow = $$<HTMLButtonElement>(chips?.shadowRoot, 'button')[1];
+  const view = $<HTMLElement & { selectedDay: string }>(el.shadowRoot, 'tvg-channel-view');
+  const tomorrow = $$<HTMLButtonElement>($(view?.shadowRoot, 'tvg-day-chips')?.shadowRoot, 'button')[1];
   tomorrow?.click();
   await settle(el);
 
-  expect(server.requests('tv_guide/schedule')).toContainEqual({
-    type: 'tv_guide/schedule',
-    channel_id: 'TVN',
-    ...isoRange('2026-10-20'),
-  });
   expect(view?.selectedDay).toBe('2026-10-20');
-  expect(view?.programmes.map((p) => p.id)).toEqual([faktyTomorrow.id, uwagaTomorrow.id]);
+  expect(server.requests('tv_guide/schedule')).toHaveLength(1);
+});
+
+test('a failed schedule shows the load error, not the "no guide" text', async () => {
+  const setup = makeHass();
+  const { el, server } = await mount(setup);
+  server.fail = { code: 'not_loaded', message: 'not loaded' };
+  server.failType = 'tv_guide/schedule';
+  $<HTMLElement>(rowOf(el, 5)?.shadowRoot, '.info')?.click();
+  await settle(el);
+  const view = $(el.shadowRoot, 'tvg-channel-view');
+  expect($(view?.shadowRoot, '.no-guide')?.textContent).toBe('The guide is not loaded yet.');
+
+  server.fail = { code: 'boom', message: 'boom' };
+  $<HTMLElement>(view?.shadowRoot, '[data-close]')?.click();
+  $<HTMLElement>(rowOf(el, 3)?.shadowRoot, '.info')?.click();
+  await settle(el);
+  expect($($(el.shadowRoot, 'tvg-channel-view')?.shadowRoot, '.no-guide')?.textContent).toBe('Cannot load the guide. Trying again soon.');
+});
+
+test('the older schedule answer is dropped when another channel was opened meanwhile', async () => {
+  const { el, server } = await mount();
+  server.hold.add('tv_guide/schedule');
+  $<HTMLElement>(rowOf(el, 5)?.shadowRoot, '.info')?.click();
+  await settle(el);
+  $<HTMLElement>($(el.shadowRoot, 'tvg-channel-view')?.shadowRoot, '[data-close]')?.click();
+  $<HTMLElement>(rowOf(el, 3)?.shadowRoot, '.info')?.click();
+  await settle(el);
+
+  server.release('tv_guide/schedule', (m) => m.channel_id === 'Polsat');
+  await settle(el);
+  server.release('tv_guide/schedule', (m) => m.channel_id === 'TVN');
+  await settle(el);
+
+  const view = $<HTMLElement & { programmes: Programme[]; channel: { number: number }; loading: boolean }>(el.shadowRoot, 'tvg-channel-view');
+  expect(view?.channel.number).toBe(3);
+  expect(view?.programmes.map((p) => p.channel_id)).toEqual(['Polsat', 'Polsat', 'Polsat']);
+  expect(view?.loading).toBe(false);
+});
+
+test('the older schedule answer is dropped when it arrives last', async () => {
+  const { el, server } = await mount();
+  server.hold.add('tv_guide/schedule');
+  $<HTMLElement>(rowOf(el, 5)?.shadowRoot, '.info')?.click();
+  await settle(el);
+  $<HTMLElement>($(el.shadowRoot, 'tvg-channel-view')?.shadowRoot, '[data-close]')?.click();
+  $<HTMLElement>(rowOf(el, 3)?.shadowRoot, '.info')?.click();
+  await settle(el);
+
+  server.release('tv_guide/schedule', (m) => m.channel_id === 'TVN');
+  await settle(el);
+  const view = $<HTMLElement & { programmes: Programme[]; loading: boolean }>(el.shadowRoot, 'tvg-channel-view');
+  expect(view?.programmes).toEqual([]);
+  expect(view?.loading).toBe(true);
 });
 
 test('a channel without a guide id opens without asking the server', async () => {
@@ -261,11 +330,9 @@ test('a programme from search opens its channel on its day with the programme vi
   $<HTMLElement>(row?.shadowRoot, '.info')?.click();
   await settle(el);
 
-  expect(server.requests('tv_guide/schedule')).toContainEqual({
-    type: 'tv_guide/schedule',
-    channel_id: 'Polsat',
-    ...isoRange('2026-10-20'),
-  });
+  expect(server.requests('tv_guide/schedule')).toEqual([
+    expect.objectContaining({ channel_id: 'Polsat', start: isoRange('2026-10-19').start }),
+  ]);
   const view = $<HTMLElement & { selectedDay: string; channel: { number: number } }>(el.shadowRoot, 'tvg-channel-view');
   expect(view?.channel.number).toBe(3);
   expect(view?.selectedDay).toBe('2026-10-20');
@@ -294,6 +361,93 @@ test('a programme from the airings opens the channel and the day of that airing'
     programme_id: faktyPolsat.id,
     channel_ids: ['Polsat', 'TVN'],
   });
+});
+
+test('an airing on the same channel but another day switches the selected day without a request', async () => {
+  const setup = makeHass();
+  setup.server.airings = [faktyTomorrow];
+  const { el, server } = await mount(setup);
+  $<HTMLElement>(rowOf(el, 5)?.shadowRoot, '.info')?.click();
+  await settle(el);
+  $<HTMLElement>($(el.shadowRoot, 'tvg-channel-view')?.shadowRoot, '.slot')?.click();
+  await settle(el);
+  $<HTMLElement>($(el.shadowRoot, 'tvg-programme-view')?.shadowRoot, '.air')?.click();
+  await settle(el);
+
+  const view = $<HTMLElement & { selectedDay: string }>(el.shadowRoot, 'tvg-channel-view');
+  expect(view?.selectedDay).toBe('2026-10-20');
+  expect($<HTMLElement & { programme: Programme }>(el.shadowRoot, 'tvg-programme-view')?.programme.id).toBe(faktyTomorrow.id);
+  expect(server.requests('tv_guide/schedule')).toHaveLength(1);
+});
+
+test('the older airings answer is dropped after a quick programme switch', async () => {
+  const setup = makeHass();
+  setup.server.airingsBy = { [fakty.id]: [faktyDay3], [sport.id]: [uwagaTomorrow] };
+  const { el, server } = await mount(setup);
+  $<HTMLElement>(rowOf(el, 5)?.shadowRoot, '.info')?.click();
+  await settle(el);
+  server.hold.add('tv_guide/airings');
+  const slots = () => $$<HTMLElement>($(el.shadowRoot, 'tvg-channel-view')?.shadowRoot, '.slot');
+  slots()[0]?.click();
+  await settle(el);
+  $<HTMLElement>($(el.shadowRoot, 'tvg-programme-view')?.shadowRoot, '[data-back]')?.click();
+  await settle(el);
+  slots()[1]?.click();
+  await settle(el);
+
+  server.release('tv_guide/airings', (m) => m.programme_id === sport.id);
+  await settle(el);
+  server.release('tv_guide/airings', (m) => m.programme_id === fakty.id);
+  await settle(el);
+
+  const programmeView = $<HTMLElement & { programme: Programme; airings: Programme[] | null }>(el.shadowRoot, 'tvg-programme-view');
+  expect(programmeView?.programme.id).toBe(sport.id);
+  expect(programmeView?.airings).toEqual([uwagaTomorrow]);
+});
+
+test('the older refresh cannot overwrite a newer one', async () => {
+  const { el, server } = await mount();
+  server.hold.add('tv_guide/now');
+  await vi.advanceTimersByTimeAsync(MINUTE);
+  await vi.advanceTimersByTimeAsync(MINUTE);
+  await settle(el);
+
+  server.release('tv_guide/now', () => true, { Polsat: zycie, TVN: sport }, true);
+  await settle(el);
+  server.release('tv_guide/now', () => true, { Polsat: zycie, TVN: fakty });
+  await settle(el);
+  expect(rowOf(el, 5)?.programme?.title).toBe('Sport');
+});
+
+test('a failing info request does not block the programmes on now', async () => {
+  const setup = makeHass();
+  setup.server.fail = { code: 'boom', message: 'boom' };
+  setup.server.failType = 'tv_guide/info';
+  const { server } = await mount(setup);
+  expect(server.requests('tv_guide/now')).toHaveLength(1);
+});
+
+test('a new connection does not refresh while the card is disconnected', async () => {
+  const first = makeHass();
+  const { el } = await mount(first);
+  el.remove();
+  const second = makeHass();
+  el.hass = { ...first.hass, connection: second.hass.connection };
+  await vi.advanceTimersByTimeAsync(0);
+  expect(second.server.send).not.toHaveBeenCalled();
+
+  document.body.append(el);
+  await settle(el);
+  expect(second.server.requests('tv_guide/now')).toHaveLength(1);
+});
+
+test('a failed search step says so instead of "no match"', async () => {
+  const { el, server } = await mount();
+  server.fail = { code: 'boom', message: 'boom' };
+  server.failType = 'tv_guide/search';
+  await typeQuery(el, 'zzz');
+  expect(text(el)).toContain('Cannot load the guide. Trying again soon.');
+  expect(text(el)).not.toContain('No channel or programme matches');
 });
 
 test('Enter in the search box switches to the first result', async () => {

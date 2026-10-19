@@ -130,6 +130,12 @@ test('while loading it shows a loading row instead of the "no guide" text', asyn
   expect($(el, '.no-guide')).toBeNull();
 });
 
+test('a load error is shown instead of the "no guide" text', async () => {
+  const el = await mount({ programmes: [], days: [], error: 'Cannot load the guide.' });
+  expect($(el, '.no-guide')?.textContent).toBe('Cannot load the guide.');
+  expect(el.shadowRoot?.textContent).not.toContain('No programme guide for this channel.');
+});
+
 test('has exactly one header, with touch-action none, and the close button fires tvg-close', async () => {
   const el = await mount();
   expect($$(el, 'header')).toHaveLength(1);

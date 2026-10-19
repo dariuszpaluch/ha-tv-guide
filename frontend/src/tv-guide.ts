@@ -12,6 +12,7 @@ import { GuideClient, GuideError } from './data/guide-client';
 import { channelEntries, guideIcons, logoOf } from './data/logos';
 import { SearchRunner, firstResult, type SearchResults } from './data/search';
 import { formatLastSuccess, isStale } from './data/stale';
+import { overlapsDay } from './components/view-parts';
 import { hour12, timeZoneOf, tvDayKey, tvDayRange, tvDays } from './data/time';
 import { en, localeOf, resolveLanguage, translator, type Translate } from './i18n';
 import type { GuideErrorCode, GuideInfo, NowMap, Programme } from './types/api';
@@ -33,9 +34,13 @@ interface Details {
   open: boolean;
   /** Selected TV day, `YYYY-MM-DD`. */
   day: string;
+  /** Days with programmes, from today on. */
   days: string[];
+  /** Programmes of the channel for all days. The channel view picks the ones of the selected day. */
   programmes: Programme[];
   loading: boolean;
+  /** Set when the schedule request failed. The channel view then shows the error, not "no guide". */
+  error?: LoadError;
   showEarlier: boolean;
   programme?: Programme;
   showProgramme: boolean;
@@ -91,8 +96,8 @@ export class TvGuide extends LitElement {
   private switchTimer?: ReturnType<typeof setTimeout>;
   private icons = new Map<string, string>();
   /** Each counter makes the answers of older requests stale. */
+  private refreshRun = 0;
   private scheduleRun = 0;
-  private daysRun = 0;
   private airingsRun = 0;
   private translateCache?: { language: string; t: Translate };
 
@@ -123,13 +128,15 @@ export class TvGuide extends LitElement {
     this.prepareClient();
     if (previous && previous.connection !== hass.connection && this.client) {
       // HA gives a new connection after a reconnect. The old answers are no longer trustworthy.
+      // A disconnected card refreshes when it is connected again.
       this.client.setConnection(hass.connection);
-      void this.refresh();
+      if (this.isConnected) void this.refresh();
     }
     this.startRefreshing();
     if (!previous || this.looksDifferent(previous, hass)) this.requestUpdate();
   }
 
+  /** The hass object that HA last gave to the card. */
   get hass(): HomeAssistant | undefined {
     return this.hassObject;
   }
@@ -139,11 +146,13 @@ export class TvGuide extends LitElement {
     return CARD_SIZE;
   }
 
+  /** Starts the refresh timer again when the card comes back to the page. */
   connectedCallback(): void {
     super.connectedCallback();
     this.startRefreshing();
   }
 
+  /** Stops the timers and the running search. A card that is off the page makes no requests. */
   disconnectedCallback(): void {
     this.stopRefreshing();
     clearTimeout(this.switchTimer);
@@ -183,59 +192,71 @@ export class TvGuide extends LitElement {
     void this.refresh();
   }
 
+  /** Stops the 60 second refresh. */
   private stopRefreshing(): void {
     clearInterval(this.refreshTimer);
     this.refreshTimer = undefined;
   }
 
   /**
-   * Loads the guide state and what is on now. The client caches the channels for the session.
+   * Loads the guide state and what is on now, all at once, so a failing request does not hold back the others.
+   * The client caches the channels for the session.
    * A failure shows a message; the next tick tries again, so the card recovers when the integration is ready.
    */
   private async refresh(): Promise<void> {
     const { client, config } = this;
+    const run = ++this.refreshRun;
     if (!client || !config) return;
     this.nowMs = Date.now();
+    const ids = channelIds(config);
     try {
-      const [info, guideChannels] = await Promise.all([client.info(), client.channels()]);
-      const ids = channelIds(config);
-      const nowMap = ids.length > 0 ? await client.now(ids, { force: true }) : {};
-      if (client !== this.client) return;
+      const [info, guideChannels, nowMap] = await Promise.all([
+        client.info(),
+        client.channels(),
+        ids.length > 0 ? client.now(ids, { force: true }) : Promise.resolve<NowMap>({}),
+      ]);
+      if (run !== this.refreshRun || client !== this.client) return;
       this.icons = guideIcons(guideChannels);
       this.entries = channelEntries(config, this.icons);
       this.info = info;
       this.nowMap = nowMap;
       this.loadError = undefined;
     } catch (error) {
-      if (client !== this.client) return;
+      if (run !== this.refreshRun || client !== this.client) return;
       this.loadError = error instanceof GuideError ? error.code : 'unknown';
     }
   }
 
+  /** The `t()` function for the language of the HA profile. */
   private strings(): Translate {
     const language = this.hassObject?.locale.language ?? 'en';
     if (this.translateCache?.language !== language) this.translateCache = { language, t: translator(language) };
     return this.translateCache.t;
   }
 
+  /** All channels of the card, in config order. */
   private channels(): ChannelConfig[] {
     return this.config?.sections.flatMap((section) => section.channels) ?? [];
   }
 
+  /** The first channel with this number. */
   private channelByNumber(number: number): ChannelConfig | undefined {
     return this.channels().find((channel) => channel.number === number);
   }
 
+  /** Time zone of the HA profile. */
   private timeZone(): string {
     return this.hassObject ? timeZoneOf(this.hassObject) : 'UTC';
   }
 
+  /** Key of the current TV day. */
   private todayKey(): string {
     return tvDayKey(this.nowMs, this.timeZone(), this.config?.tv_day_starts_at ?? 0);
   }
 
   // ---- switching ----
 
+  /** Calls the switch action for a channel. A failure goes to the HA notification area. */
   private switchTo(channel: ChannelConfig): void {
     const { config, hassObject } = this;
     if (!config || !hassObject) return;
@@ -262,6 +283,7 @@ export class TvGuide extends LitElement {
     );
   }
 
+  /** A tap on the left part of a row or on the switch button. */
   private readonly onSwitch = (event: HTMLElementEventMap['tvg-switch']): void => {
     const channel = this.channelByNumber(event.detail.number);
     if (channel) this.switchTo(channel);
@@ -269,6 +291,7 @@ export class TvGuide extends LitElement {
 
   // ---- search ----
 
+  /** The search text changed. */
   private readonly onSearch = (event: HTMLElementEventMap['tvg-search']): void => {
     if (!this.config) return;
     this.query = event.detail.query;
@@ -277,6 +300,7 @@ export class TvGuide extends LitElement {
     if (list) list.scrollTop = 0;
   };
 
+  /** Enter in the search box: switch to the first result. */
   private readonly onSubmit = (): void => {
     const { config, results } = this;
     if (!config || !results || results.query === '') return;
@@ -301,45 +325,62 @@ export class TvGuide extends LitElement {
     return known.find((programme): programme is Programme => programme?.id === id);
   }
 
+  /** A tap on the right part of a row. */
   private readonly onOpenChannel = (event: HTMLElementEventMap['tvg-open-channel']): void => {
     const channel = this.channelByNumber(event.detail.number);
     if (channel) this.openChannel(channel, this.todayKey());
   };
 
+  /**
+   * A tap on a programme in the schedule, the airings or the search results.
+   * It opens the channel on the TV day of the programme, then the programme view.
+   */
   private readonly onOpenProgramme = (event: HTMLElementEventMap['tvg-open-programme']): void => {
     const channel = this.channelByNumber(event.detail.number);
     const programme = this.findProgramme(event.detail.programmeId);
-    if (!channel || !programme) return;
+    const startHour = this.config?.tv_day_starts_at;
+    if (!channel || !programme || startHour === undefined) return;
+    const zone = this.timeZone();
     const { details } = this;
-    if (details?.open && details.channel === channel && details.programmes.some((p) => p.id === programme.id)) {
-      this.showProgramme(programme);
+    const loaded = details?.open && details.channel === channel && details.programmes.some((p) => p.id === programme.id);
+    if (loaded) {
+      // A programme that crosses the day start is on both days: stay on the selected day when it is on it.
+      const day = overlapsDay(programme, details.day, zone, startHour)
+        ? details.day
+        : tvDayKey(Date.parse(programme.start), zone, startHour);
+      this.showProgramme(programme, day);
       return;
     }
-    // The TV day of the start. A programme that began before today's start and still runs belongs to today.
-    const day = tvDayKey(Date.parse(programme.start), this.timeZone(), this.config?.tv_day_starts_at ?? 0);
+    // A programme that began before today's start and still runs belongs to today.
+    const day = tvDayKey(Date.parse(programme.start), zone, startHour);
     this.openChannel(channel, day < this.todayKey() ? this.todayKey() : day, programme);
   };
 
+  /** A tap on a day chip. All days are loaded already, so this makes no request. */
   private readonly onDay = (event: HTMLElementEventMap['tvg-day']): void => {
     if (!this.details) return;
-    this.details = { ...this.details, day: event.detail.key, programmes: [], showEarlier: false };
-    void this.loadDay();
+    this.details = { ...this.details, day: event.detail.key, showEarlier: false };
+    // A failed schedule is tried again on the next tap.
+    if (this.details.error) void this.loadSchedule();
   };
 
+  /** The programme view was closed (arrow or swipe). */
   private readonly onBack = (): void => {
     if (this.details) this.details = { ...this.details, showProgramme: false };
   };
 
+  /** The sheet was closed. It keeps its content while it slides away. */
   private readonly onClose = (): void => {
     if (this.details) this.details = { ...this.details, open: false };
   };
 
+  /** A tap on "Show N earlier". */
   private readonly onShowEarlier = (): void => {
     if (this.details) this.details = { ...this.details, showEarlier: true };
   };
 
   /**
-   * Opens the sheet on a channel and a TV day, and loads the schedule of that day.
+   * Opens the sheet on a channel and a TV day, and loads the schedule.
    * With `programme` the programme view opens on top.
    */
   private openChannel(channel: ChannelConfig, day: string, programme?: Programme): void {
@@ -356,19 +397,22 @@ export class TvGuide extends LitElement {
       showProgramme: programme !== undefined,
       airings: null,
     };
-    void this.loadDay();
-    void this.loadDays();
+    void this.loadSchedule();
     if (programme) void this.loadAirings(programme);
   }
 
-  private showProgramme(programme: Programme): void {
+  /** Shows the programme view for a programme of the open channel, on the given day. */
+  private showProgramme(programme: Programme, day: string): void {
     if (!this.details) return;
-    this.details = { ...this.details, programme, showProgramme: true, airings: null };
+    this.details = { ...this.details, day, programme, showProgramme: true, airings: null };
     void this.loadAirings(programme);
   }
 
-  /** Loads the schedule of the selected day of the open channel. */
-  private async loadDay(): Promise<void> {
+  /**
+   * Loads the schedule of the open channel in one request: from the start of today to 14 days ahead.
+   * The same answer gives the day chips and the programmes of every day.
+   */
+  private async loadSchedule(): Promise<void> {
     const { client, config, details } = this;
     const run = ++this.scheduleRun;
     if (!client || !config || !details) return;
@@ -377,28 +421,27 @@ export class TvGuide extends LitElement {
       this.details = { ...details, loading: false };
       return;
     }
-    this.details = { ...details, loading: true };
-    const { start, end } = tvDayRange(details.day, this.timeZone(), config.tv_day_starts_at);
-    const programmes = await client.schedule(id, start, end).catch((): Programme[] => []);
-    if (run !== this.scheduleRun || !this.details) return;
-    this.details = { ...this.details, programmes, loading: false };
-  }
-
-  /** Finds the days that have programmes, for the day chips. */
-  private async loadDays(): Promise<void> {
-    const { client, config, details } = this;
-    const run = ++this.daysRun;
-    const id = details?.channel.epg_id;
-    if (!client || !config || !details || id === undefined) return;
+    this.details = { ...details, loading: true, error: undefined };
     const zone = this.timeZone();
     const today = this.todayKey();
     const { start } = tvDayRange(today, zone, config.tv_day_starts_at);
-    const programmes = await client.schedule(id, start, start + GUIDE_HORIZON_DAYS * DAY_MS).catch((): Programme[] => []);
-    if (run !== this.daysRun || !this.details) return;
-    const days = tvDays(programmes, today, zone, config.tv_day_starts_at);
-    this.details = { ...this.details, days: [...new Set([...days, this.details.day])].sort() };
+    try {
+      const programmes = await client.schedule(id, start, start + GUIDE_HORIZON_DAYS * DAY_MS);
+      if (run !== this.scheduleRun || !this.details) return;
+      const days = tvDays(programmes, today, zone, config.tv_day_starts_at);
+      this.details = {
+        ...this.details,
+        programmes,
+        days: [...new Set([...days, this.details.day])].sort(),
+        loading: false,
+      };
+    } catch (error) {
+      if (run !== this.scheduleRun || !this.details) return;
+      this.details = { ...this.details, loading: false, error: error instanceof GuideError ? error.code : 'unknown' };
+    }
   }
 
+  /** Loads the other airings of a programme. A failure leaves the list empty. */
   private async loadAirings(programme: Programme): Promise<void> {
     const { client, config } = this;
     const run = ++this.airingsRun;
@@ -412,6 +455,7 @@ export class TvGuide extends LitElement {
 
   static styles = tvGuideStyles;
 
+  /** The search box, the stale hint, the channel list or search results, and the details sheet. */
   protected render(): TemplateResult | typeof nothing {
     const { config, hassObject } = this;
     if (!config || !hassObject) return nothing;
@@ -431,12 +475,13 @@ export class TvGuide extends LitElement {
       @tvg-show-earlier=${this.onShowEarlier}
     >
       <tvg-search-box class="panel" .value=${this.query} .t=${t}></tvg-search-box>
-      ${stale && this.info ? html`<div class="stale">${t('staleGuide', this.lastSuccessText())}</div>` : nothing}
+      ${stale ? html`<div class="stale">${t('staleGuide', this.lastSuccessText())}</div>` : nothing}
       <div class="panel list">${this.renderList(t)}</div>
       ${this.renderToast(t)} ${this.renderDetails(t)}
     </div>`;
   }
 
+  /** Day and time of the last good download, for the stale hint. */
   private lastSuccessText(): string {
     const { info, hassObject } = this;
     if (!info || !hassObject) return '';
@@ -444,6 +489,7 @@ export class TvGuide extends LitElement {
     return formatLastSuccess(info, locale, this.timeZone(), hour12(hassObject.locale.time_format));
   }
 
+  /** A short note about the channel switch in progress. */
   private renderToast(t: Translate): TemplateResult | typeof nothing {
     const channel = this.switchingNumber === undefined ? undefined : this.channelByNumber(this.switchingNumber);
     return channel
@@ -451,6 +497,7 @@ export class TvGuide extends LitElement {
       : nothing;
   }
 
+  /** The channel list, the search results, or a message when the guide cannot be shown. */
   private renderList(t: Translate): TemplateResult {
     if (this.loadError && !this.nowMap) return html`<div class="empty">${t(loadErrorKey(this.loadError))}</div>`;
     if (!this.nowMap) return html`<div class="searching"><span class="spinner"></span>${t('loading')}</div>`;
@@ -464,6 +511,7 @@ export class TvGuide extends LitElement {
     )}`;
   }
 
+  /** A channel row. `first` marks the one that Enter switches to; `highlight` is the query to mark. */
   private renderChannelRow(channel: ChannelConfig, t: Translate, first: boolean, highlight: string): TemplateResult {
     const { hassObject } = this;
     const language = resolveLanguage(hassObject?.locale.language);
@@ -484,6 +532,7 @@ export class TvGuide extends LitElement {
     ></tvg-channel-row>`;
   }
 
+  /** A programme found by search, with its channel. Nothing for a channel that is not in the card. */
   private renderProgrammeRow(programme: Programme, t: Translate, first: boolean, highlight: string) {
     const entry = this.entries.get(programme.channel_id);
     const { hassObject, config } = this;
@@ -507,9 +556,10 @@ export class TvGuide extends LitElement {
 
   /** The three search steps. Each step shows when it is ready. */
   private renderResults(results: SearchResults, t: Translate): TemplateResult {
-    const { query, channels, now, later } = results;
+    const { query, channels, now, later, error } = results;
+    const failed = error ? html`<div class="empty">${t(loadErrorKey(error))}</div>` : undefined;
     if (now && later && !channels.length && !now.length && !later.length) {
-      return html`<div class="empty">${t('noMatch', this.query.trim())}</div>`;
+      return failed ?? html`<div class="empty">${t('noMatch', this.query.trim())}</div>`;
     }
     const target = this.config ? firstResult(results, this.config) : undefined;
     let firstUsed = false;
@@ -534,9 +584,10 @@ export class TvGuide extends LitElement {
       ? html`<div class="section">${t('channels')}</div>
           ${channels.map((channel) => this.renderChannelRow(channel, t, isFirst(channel), query))}`
       : nothing}
-    ${programmes(t('onNow'), now)} ${programmes(t('later'), later)}`;
+    ${programmes(t('onNow'), now)} ${programmes(t('later'), later)} ${failed}`;
   }
 
+  /** The sheet with the channel view and, on top of it, the programme view. */
   private renderDetails(t: Translate): TemplateResult | typeof nothing {
     const { details, config, hassObject } = this;
     if (!details || !config || !hassObject) return nothing;
@@ -564,6 +615,7 @@ export class TvGuide extends LitElement {
         .startHour=${config.tv_day_starts_at}
         .darkMode=${darkMode}
         .loading=${details.loading}
+        .error=${details.error ? t(loadErrorKey(details.error)) : ''}
       ></tvg-channel-view>
       ${programme
         ? html`<tvg-programme-view

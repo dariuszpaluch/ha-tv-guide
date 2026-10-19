@@ -48,6 +48,8 @@ export class TvgChannelView extends LitElement {
   @property({ attribute: false }) darkMode = false;
   /** The schedule is still on its way. */
   @property({ attribute: false }) loading = false;
+  /** Text for a schedule that failed to load. Empty when the load worked. It replaces the "no guide" text. */
+  @property({ attribute: false }) error = '';
 
   private readonly broken = new BrokenPosters(this);
 
@@ -206,6 +208,7 @@ export class TvgChannelView extends LitElement {
 
   private renderBody() {
     if (this.loading) return renderLoading(this.t);
+    if (this.error) return html`<p class="no-guide">${this.error}</p>`;
     if (!this.programmes.length) return html`<p class="no-guide">${this.t('noGuideLong')}</p>`;
     return this.renderSchedule();
   }
