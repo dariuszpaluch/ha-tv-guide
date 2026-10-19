@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 import {
   dayLabel,
   formatDuration,
@@ -179,4 +179,12 @@ describe('progress', () => {
     expect(progress(sport, NOW)).toBe(0);
     expect(progress(fakty, Date.parse('2026-10-19T20:00:00+02:00'))).toBe(100);
   });
+});
+
+test('tvDayKey reuses one formatter per time zone', () => {
+  tvDayKey(NOW, WAW, 5);
+  const spy = vi.spyOn(Intl, 'DateTimeFormat');
+  for (let i = 0; i < 100; i++) tvDayKey(NOW + i * 3600e3, WAW, 5);
+  expect(spy).not.toHaveBeenCalled();
+  spy.mockRestore();
 });

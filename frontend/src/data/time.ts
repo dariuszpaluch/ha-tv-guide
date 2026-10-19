@@ -16,21 +16,37 @@ interface WallClock {
   minute: number;
 }
 
+/** Building a formatter is slow (about 0.1 ms) and a schedule asks for hundreds of TV day keys, so one per zone is kept. */
+const wallClockFormats = new Map<string, Intl.DateTimeFormat>();
+
+/**
+ * The formatter that gives the wall-clock parts in a time zone.
+ * @param timeZone IANA time zone name.
+ */
+const wallClockFormat = (timeZone: string): Intl.DateTimeFormat => {
+  let format = wallClockFormats.get(timeZone);
+  if (!format) {
+    format = new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      hourCycle: 'h23',
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: 'numeric',
+    });
+    wallClockFormats.set(timeZone, format);
+  }
+  return format;
+};
+
 /**
  * Wall-clock date and time of an instant in a time zone.
  * @param ms Instant in milliseconds since the epoch.
  * @param timeZone IANA time zone name.
  */
 const wallClock = (ms: number, timeZone: string): WallClock => {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone,
-    hourCycle: 'h23',
-    year: 'numeric',
-    month: 'numeric',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: 'numeric',
-  }).formatToParts(ms);
+  const parts = wallClockFormat(timeZone).formatToParts(ms);
   const part = (type: Intl.DateTimeFormatPartTypes): number => Number(parts.find((p) => p.type === type)?.value);
   return { year: part('year'), month: part('month'), day: part('day'), hour: part('hour'), minute: part('minute') };
 };
