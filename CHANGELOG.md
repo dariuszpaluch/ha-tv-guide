@@ -21,7 +21,7 @@ First release.
 - Details sheet with the schedule for each day.
 - Programme details and more airings of the same programme.
 - Search in three steps: channels, then programmes on now, then programmes later.
-- A tap switches the channel with any Home Assistant action.
+- A tap switches the channel with any Home Assistant action. A failed switch shows one message, not two.
 - A channel that is not selected in the integration says so.
 - Example config with about 40 Polish channels (`examples/card.yaml`).
 - Channel numbers can be text, such as `5.1`.

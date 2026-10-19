@@ -174,7 +174,7 @@ test('tvg-switch calls the switch action and marks the row for 1.6 seconds', asy
   const { el, callService } = await mount();
   $<HTMLElement>(rowOf(el, 3)?.shadowRoot, '.zap')?.click();
   await settle(el);
-  expect(callService).toHaveBeenCalledWith('script', 'cable_box_go_to_channel', { channel: 3 });
+  expect(callService).toHaveBeenCalledWith('script', 'cable_box_go_to_channel', { channel: 3 }, undefined, false);
   expect($(rowOf(el, 3)?.shadowRoot, '.zap.switching')).not.toBeNull();
   expect(text(el)).toContain('Switching to 3 Polsat');
 
@@ -192,14 +192,14 @@ test('a text channel number such as 5.1 is shown, switched to and opened as it i
 
   $<HTMLElement>(row?.shadowRoot, '.zap')?.click();
   await settle(el);
-  expect(callService).toHaveBeenCalledWith('script', 'cable_box_go_to_channel', { channel: '5.1' });
+  expect(callService).toHaveBeenCalledWith('script', 'cable_box_go_to_channel', { channel: '5.1' }, undefined, false);
 
   $<HTMLElement>(row?.shadowRoot, '.info')?.click();
   await settle(el);
   expect($(el.shadowRoot, 'tvg-channel-view')).not.toBeNull();
 });
 
-test('a failed switch sends a hass-notification', async () => {
+test('a failed switch sends one hass-notification, because HA is told not to show its own', async () => {
   const setup = makeHass();
   setup.callService.mockRejectedValueOnce(new Error('offline'));
   const { el } = await mount(setup);
@@ -509,7 +509,7 @@ test('Enter in the search box switches to the first result', async () => {
   const input = await typeQuery(el, 'tvn');
   input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, composed: true }));
   await settle(el);
-  expect(callService).toHaveBeenCalledWith('script', 'cable_box_go_to_channel', { channel: 5 });
+  expect(callService).toHaveBeenCalledWith('script', 'cable_box_go_to_channel', { channel: 5 }, undefined, false);
 });
 
 test('a blank query shows the normal list and a query without matches says so', async () => {

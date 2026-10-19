@@ -279,7 +279,10 @@ export class TvGuide extends LitElement {
 
   // ---- switching ----
 
-  /** Calls the switch action for a channel. A failure goes to the HA notification area. */
+  /**
+   * Calls the switch action for a channel. A failure goes to the HA notification area.
+   * HA is told not to show its own error toast, so the user sees one message: the card's.
+   */
   private switchTo(channel: ChannelConfig): void {
     const { config, hassObject } = this;
     if (!config || !hassObject) return;
@@ -290,7 +293,7 @@ export class TvGuide extends LitElement {
     this.switchTimer = setTimeout(() => {
       this.switchingNumber = undefined;
     }, SWITCH_FEEDBACK_MS);
-    hassObject.callService(call.domain, call.service, call.data).then(
+    hassObject.callService(call.domain, call.service, call.data, undefined, false).then(
       () => {
         this.activeNumber = channel.number;
       },
