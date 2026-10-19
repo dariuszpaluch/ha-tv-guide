@@ -130,3 +130,22 @@ test('is a labelled dialog and reflects the open state', async () => {
   expect(part('.sheet').classList.contains('open')).toBe(true);
   expect(part('.sheet').classList.contains('prog-open')).toBe(true);
 });
+
+test('swipes still work after the sheet is moved in the DOM', async () => {
+  const { el, part, onClose, onBack } = await mount({ showProgramme: true });
+  const parent = document.createElement('section');
+  document.body.append(parent);
+  parent.append(el);
+  await el.updateComplete;
+
+  drag(part('.grab'), [150, 0], [150, 200], 400);
+  expect(onClose).toHaveBeenCalledTimes(1);
+  drag(slotted(el, 'programme', '.content'), [0, 100], [150, 100], 400);
+  expect(onBack).toHaveBeenCalledTimes(1);
+});
+
+test('Escape does nothing while the sheet is closed', async () => {
+  const { el, onClose } = await mount({ open: false });
+  el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+  expect(onClose).not.toHaveBeenCalled();
+});

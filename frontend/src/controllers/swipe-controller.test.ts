@@ -180,3 +180,12 @@ test('hostDisconnected removes the listeners', async () => {
   body.click();
   expect(onClick).toHaveBeenCalledTimes(1);
 });
+
+test('a drag still works when setPointerCapture throws', () => {
+  const { element, onDone } = setup();
+  element.setPointerCapture = () => {
+    throw new DOMException('gone', 'NotFoundError');
+  };
+  drag(element, [0, 100], [150, 100], 400);
+  expect(onDone).toHaveBeenCalledTimes(1);
+});

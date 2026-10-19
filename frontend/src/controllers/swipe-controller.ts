@@ -49,6 +49,8 @@ export class SwipeController implements ReactiveController {
 
   hostConnected(): void {
     this.host.addEventListener('click', this.onClickCapture, true);
+    // After a move in the DOM the host reconnects without a new render, so `hostUpdated` does not run.
+    this.hostUpdated();
   }
 
   /** The listening element is inside the rendered DOM, so it is picked up after each render. */
@@ -121,7 +123,7 @@ export class SwipeController implements ReactiveController {
         return;
       }
       drag.active = true;
-      element.setPointerCapture(event.pointerId);
+      this.capture(element, event.pointerId, true);
       target.style.transition = 'none';
     }
     const offset = Math.max(0, along);
@@ -134,7 +136,7 @@ export class SwipeController implements ReactiveController {
     if (!drag || event.pointerId !== drag.pointerId) return;
     this.drag = null;
     if (!drag.active) return;
-    element?.releasePointerCapture(event.pointerId);
+    if (element) this.capture(element, event.pointerId, false);
 
     const target = this.options.target();
     const along = this.along(event, drag);
@@ -153,6 +155,16 @@ export class SwipeController implements ReactiveController {
     this.options.onProgress?.(null);
     if (event.type === 'pointerup' && (far || fast)) this.options.onDone();
   };
+
+  /** Capture can throw when the browser has already dropped the pointer; the drag works without it. */
+  private capture(element: HTMLElement, pointerId: number, on: boolean): void {
+    try {
+      if (on) element.setPointerCapture(pointerId);
+      else element.releasePointerCapture(pointerId);
+    } catch {
+      // Nothing to do: the pointer is gone.
+    }
+  }
 
   private onClickCapture = (event: Event): void => {
     if (!this.justDragged) return;

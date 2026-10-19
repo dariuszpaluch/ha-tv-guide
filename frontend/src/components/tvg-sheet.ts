@@ -30,8 +30,8 @@ export class TvgSheet extends LitElement {
     if (scrim) scrim.style.opacity = share === null ? '' : String(1 - share);
   };
 
-  private closeSwipe(element: () => HTMLElement | null, from?: string): SwipeController {
-    return new SwipeController(this, {
+  private closeSwipe(element: () => HTMLElement | null, from?: string): void {
+    new SwipeController(this, {
       element,
       axis: 'y',
       target: this.sheet,
@@ -44,22 +44,19 @@ export class TvgSheet extends LitElement {
 
   // Both close drags and the swipe back listen on the host, not on the views in the shadow DOM:
   // the views are slotted, and the pointer events of slotted content bubble through the host.
-  private readonly swipes: SwipeController[];
-
   constructor() {
     super();
-    this.swipes = [
-      new SwipeController(this, {
-        element: () => this,
-        axis: 'x',
-        target: () => this.view('prog'),
-        enabled: () => this.open && this.showProgramme,
-        from: '[slot="programme"]',
-        onDone: () => fire(this, 'tvg-back', {}),
-      }),
-      this.closeSwipe(() => this.renderRoot.querySelector<HTMLElement>('.grab')),
-      this.closeSwipe(() => this, 'header'),
-    ];
+    // The controllers register themselves with the host.
+    new SwipeController(this, {
+      element: () => this,
+      axis: 'x',
+      target: () => this.view('prog'),
+      enabled: () => this.open && this.showProgramme,
+      from: '[slot="programme"]',
+      onDone: () => fire(this, 'tvg-back', {}),
+    });
+    this.closeSwipe(() => this.renderRoot.querySelector<HTMLElement>('.grab'));
+    this.closeSwipe(() => this, 'header');
   }
 
   static styles = css`
@@ -160,7 +157,7 @@ export class TvgSheet extends LitElement {
   }
 
   private readonly onKeydown = (event: KeyboardEvent): void => {
-    if (event.key === 'Escape') this.close();
+    if (event.key === 'Escape' && this.open) this.close();
   };
 
   protected render() {
