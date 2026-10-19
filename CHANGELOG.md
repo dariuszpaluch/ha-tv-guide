@@ -10,6 +10,7 @@ First release.
 - Reads the guide as a stream, so a large file does not fill the memory.
 - A programme without an end time ends when the next one starts. The channel name is the first display name that is not empty.
 - Keeps only the channels you select. The channel list shows the guide id when it is not the same as the name.
+- Without `entry_id` the card uses the first loaded guide, so a disabled guide in front does not break it.
 - Stores the last good guide on disk. The card works when the source is down, also after you change the channel selection.
 - WebSocket API for the card: `info`, `channels`, `now`, `schedule`, `search` and `airings`.
 - Poster cache: posters are downloaded once, resized and served by Home Assistant.

@@ -3,9 +3,11 @@ from datetime import datetime
 from typing import Any
 
 import pytest
-from homeassistant.config_entries import ConfigEntryState
+from homeassistant.config_entries import ConfigEntryDisabler, ConfigEntryState
+from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.typing import MockHAClientWebSocket
 
+from custom_components.tv_guide.const import DOMAIN
 from tests.conftest import NOW, URL
 
 
@@ -121,6 +123,32 @@ async def test_not_found_without_entry(ws) -> None:
 async def test_not_found_for_unknown_entry_id(ws, loaded_entry) -> None:
     msg = await call(ws, "info", entry_id="nope")
     assert msg["error"]["code"] == "not_found"
+
+
+async def test_without_entry_id_the_first_loaded_entry_answers(hass, ws, aioclient_mock, guide_xml) -> None:
+    disabled = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="http://other/guide.xml",
+        data={"url": "http://other/guide.xml"},
+        options={"channels": ["TVN"], "update_interval": 6},
+        disabled_by=ConfigEntryDisabler.USER,
+    )
+    disabled.add_to_hass(hass)
+    loaded = MockConfigEntry(
+        domain=DOMAIN, unique_id=URL, data={"url": URL}, options={"channels": ["TVN"], "update_interval": 12}
+    )
+    loaded.add_to_hass(hass)
+    aioclient_mock.get(URL, content=guide_xml)
+    assert await hass.config_entries.async_setup(loaded.entry_id)
+    await hass.async_block_till_done()
+    assert hass.config_entries.async_entries(DOMAIN)[0] is disabled
+    assert loaded.state is ConfigEntryState.LOADED
+
+    msg = await call(ws, "info")
+    assert msg["result"]["update_interval"] == 12
+
+    msg = await call(ws, "info", entry_id=disabled.entry_id)
+    assert msg["error"]["code"] == "not_loaded"
 
 
 async def test_not_loaded_while_setup_retry(hass, ws, aioclient_mock, mock_entry) -> None:
