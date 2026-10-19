@@ -6,15 +6,19 @@ epg.ovh) is never in memory as one object, and only the selected channels are ke
 
 from __future__ import annotations
 
+import logging
 import xml.etree.ElementTree as ET
 from collections.abc import Iterator
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import IO
 
 from .const import KEEP_ENDED
 from .model import Channel, Guide, Programme
 
+_LOGGER = logging.getLogger(__name__)
+
 XMLTV_TIME_FORMAT = "%Y%m%d%H%M%S %z"
+XMLTV_TIME_FORMAT_NO_OFFSET = "%Y%m%d%H%M%S"
 ONSCREEN = "onscreen"
 YEAR_LENGTH = 4
 NO_AGE_LIMIT = "0"
@@ -33,12 +37,14 @@ def parse_guide(stream: IO[bytes], channel_ids: set[str], now: datetime) -> Guid
     """Parse the programmes of the selected channels.
 
     Programmes that ended more than `KEEP_ENDED` before `now`, programmes without a title and
-    a second programme with the same channel and start are dropped.
+    a second programme with the same channel and start are dropped. A programme with a time
+    that cannot be read is skipped, and one warning with the count is logged at the end.
     """
     channels: dict[str, Channel] = {}
     available: dict[str, str] = {}
     found: dict[str, dict[datetime, Programme]] = {cid: {} for cid in channel_ids}
     oldest = now - KEEP_ENDED
+    skipped = 0
     for element in _elements(stream, "channel", "programme"):
         if element.tag == "channel":
             channel = _channel(element)
@@ -49,9 +55,15 @@ def parse_guide(stream: IO[bytes], channel_ids: set[str], now: datetime) -> Guid
         channel_id = element.get("channel", "")
         if channel_id not in channel_ids:
             continue
-        programme = _programme(element)
+        try:
+            programme = _programme(element)
+        except ValueError:
+            skipped += 1
+            continue
         if programme and programme.stop >= oldest:
             found[channel_id].setdefault(programme.start, programme)
+    if skipped:
+        _LOGGER.warning("Skipped %d programmes with a bad start or stop time", skipped)
     return Guide(
         channels=channels,
         programmes={cid: sorted(found[cid].values(), key=lambda p: p.start) for cid in channels},
@@ -94,16 +106,24 @@ def _channel(element: ET.Element) -> Channel:
     )
 
 
+def _xmltv_time(value: str) -> datetime:
+    """Read an XMLTV time. A time without an offset is UTC, as the XMLTV format says."""
+    try:
+        return datetime.strptime(value, XMLTV_TIME_FORMAT)
+    except ValueError:
+        return datetime.strptime(value, XMLTV_TIME_FORMAT_NO_OFFSET).replace(tzinfo=UTC)
+
+
 def _programme(element: ET.Element) -> Programme | None:
-    """Build a programme, or None when it has no title."""
+    """Build a programme, or None when it has no title.
+
+    Raises ValueError when the start or stop time cannot be read.
+    """
     title = _text(element.find("title"))
     if not title:
         return None
-    try:
-        start = datetime.strptime(element.get("start", ""), XMLTV_TIME_FORMAT)
-        stop = datetime.strptime(element.get("stop", ""), XMLTV_TIME_FORMAT)
-    except ValueError as error:
-        raise ParseError(f"Bad programme time: {error}") from error
+    start = _xmltv_time(element.get("start", ""))
+    stop = _xmltv_time(element.get("stop", ""))
     icon = element.find("icon")
     rating = _text(element.find("rating/value"))
     year = _text(element.find("date"))
