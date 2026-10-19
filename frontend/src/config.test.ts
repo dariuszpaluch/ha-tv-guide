@@ -94,8 +94,22 @@ describe('validateConfig', () => {
     expect(() => validateConfig(withChannels(tvp1, { name: 'Polsat' }))).toThrow('channel "Polsat": "number" is required');
   });
 
-  test('rejects a channel number that is not a whole number', () => {
-    expect(() => validateConfig(withChannels({ ...tvp1, number: '1' }))).toThrow('channel "TVP 1 HD": "number" must be a whole number');
+  test('accepts a text channel number, such as a US sub-channel', () => {
+    const config = validateConfig(withChannels({ ...tvp1, number: ' 5.1 ' }, { ...tvp2, number: '702-1' }));
+    expect(config.sections[0]?.channels.map((channel) => channel.number)).toEqual(['5.1', '702-1']);
+  });
+
+  test('rejects a number with a fraction and asks for quotes', () => {
+    expect(() => validateConfig(withChannels({ ...tvp1, number: 5.1 }))).toThrow(
+      'channel "TVP 1 HD": "number" must be a whole number, or text in quotes such as "5.1"',
+    );
+  });
+
+  test('rejects an empty or negative channel number', () => {
+    expect(() => validateConfig(withChannels({ ...tvp1, number: '  ' }))).toThrow('channel "TVP 1 HD": "number" must not be empty');
+    expect(() => validateConfig(withChannels({ ...tvp1, number: -1 }))).toThrow(
+      'channel "TVP 1 HD": "number" must be a whole number, or text in quotes such as "5.1"',
+    );
   });
 
   test('requires a channel name', () => {
@@ -132,6 +146,11 @@ describe('switchServiceCall', () => {
       service: 'cable_box_go_to_channel',
       data: { channel: 216, note: 'ch 216' },
     });
+  });
+
+  test('a text channel number stays text', () => {
+    const config = validateConfig(baseConfig());
+    expect(switchServiceCall(config, '5.1').data).toEqual({ channel: '5.1', note: 'ch 5.1' });
   });
 
   test('replaces in nested objects and lists, and keeps other values', () => {

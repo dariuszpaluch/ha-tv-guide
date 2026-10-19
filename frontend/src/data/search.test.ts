@@ -52,6 +52,11 @@ describe('matchChannels', () => {
     expect(matchChannels(all, 'olsa')).toEqual([polsat]);
   });
 
+  test('matches a text number such as 5.1 by its prefix', () => {
+    const kqed = { number: '5.1', name: 'KQED' };
+    expect(matchChannels([kqed, tvn], '5.')).toEqual([kqed]);
+  });
+
   test('does not match a number in the middle', () => {
     expect(matchChannels(all, '2')).toEqual([]);
   });

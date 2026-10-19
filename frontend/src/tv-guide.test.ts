@@ -183,6 +183,21 @@ test('tvg-switch calls the switch action and marks the row for 1.6 seconds', asy
   expect(text(el)).not.toContain('Switching to');
 });
 
+test('a text channel number such as 5.1 is shown, switched to and opened as it is', async () => {
+  const config = { ...CONFIG, sections: [{ channels: [{ number: '5.1', name: 'KQED', epg_id: 'TVN' }] }] };
+  const { el, callService } = await mount(makeHass(), config);
+  const row = rows(el)[0];
+  expect($(row?.shadowRoot, '.number')?.textContent).toBe('5.1');
+
+  $<HTMLElement>(row?.shadowRoot, '.zap')?.click();
+  await settle(el);
+  expect(callService).toHaveBeenCalledWith('script', 'cable_box_go_to_channel', { channel: '5.1' });
+
+  $<HTMLElement>(row?.shadowRoot, '.info')?.click();
+  await settle(el);
+  expect($(el.shadowRoot, 'tvg-channel-view')).not.toBeNull();
+});
+
 test('a failed switch sends a hass-notification', async () => {
   const setup = makeHass();
   setup.callService.mockRejectedValueOnce(new Error('offline'));

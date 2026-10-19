@@ -1,8 +1,10 @@
+import type { ChannelNumber } from '../config';
+
 /** Detail of every event the card parts send to their parent. */
 export interface TvgEventDetails {
-  'tvg-switch': { number: number };
-  'tvg-open-channel': { number: number };
-  'tvg-open-programme': { number: number; programmeId: string };
+  'tvg-switch': { number: ChannelNumber };
+  'tvg-open-channel': { number: ChannelNumber };
+  'tvg-open-programme': { number: ChannelNumber; programmeId: string };
   'tvg-search': { query: string };
   'tvg-submit': Record<string, never>;
   'tvg-day': { key: string };

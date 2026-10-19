@@ -1,9 +1,15 @@
 /** Logo tile colour behind a channel logo. */
 export type LogoTile = 'dark' | 'light';
 
+/**
+ * Channel number on the box: a whole number, or text for numbers such as the US sub-channel `5.1`.
+ * Text keeps what the user wrote; YAML would turn an unquoted 5.10 into the float 5.1.
+ */
+export type ChannelNumber = number | string;
+
 /** One channel in the card config. */
 export interface ChannelConfig {
-  number: number;
+  number: ChannelNumber;
   name: string;
   /** XMLTV channel id. Without it the channel shows "No guide". */
   epg_id?: string;
@@ -94,6 +100,24 @@ const requiredList = (value: Dict, key: string, where: string): unknown[] => {
 };
 
 /**
+ * Reads a channel number: a whole number, or trimmed text.
+ * @param raw `number` from the YAML.
+ * @param where Name of the channel, for the error message.
+ */
+const channelNumber = (raw: unknown, where: string): ChannelNumber => {
+  if (raw === undefined) throw configError(where, '"number" is required');
+  if (typeof raw === 'string') {
+    const text = raw.trim();
+    if (!text) throw configError(where, '"number" must not be empty');
+    return text;
+  }
+  if (typeof raw !== 'number' || !Number.isInteger(raw) || raw < 0) {
+    throw configError(where, '"number" must be a whole number, or text in quotes such as "5.1"');
+  }
+  return raw;
+};
+
+/**
  * Validates one channel.
  * @param raw Channel from the YAML.
  * @param index Position in its section, used when the channel has no name.
@@ -103,18 +127,17 @@ const validateChannel = (raw: unknown, index: number): ChannelConfig => {
   const where =
     typeof raw.name === 'string'
       ? `channel "${raw.name}"`
-      : typeof raw.number === 'number'
+      : typeof raw.number === 'number' || typeof raw.number === 'string'
         ? `channel ${raw.number}`
         : `channel at position ${index + 1}`;
   assertKnownKeys(raw, ['number', 'name', 'epg_id', 'logo', 'logo_tile'], where);
-  if (raw.number === undefined) throw configError(where, '"number" is required');
-  if (!Number.isInteger(raw.number)) throw configError(where, '"number" must be a whole number');
+  const number = channelNumber(raw.number, where);
   const logoTile = raw.logo_tile;
   if (logoTile !== undefined && !LOGO_TILES.includes(logoTile as LogoTile)) {
     throw configError(where, '"logo_tile" must be "dark" or "light"');
   }
   return {
-    number: raw.number as number,
+    number,
     name: requiredString(raw, 'name', where),
     epg_id: optionalString(raw, 'epg_id', where),
     logo: optionalString(raw, 'logo', where),
@@ -183,7 +206,7 @@ export const validateConfig = (raw: unknown): TvGuideConfig => {
  * A string that is exactly `{number}` becomes the number. In a longer string it becomes text.
  * Objects and lists are handled deeply.
  */
-const fillNumber = (value: unknown, number: number): unknown => {
+const fillNumber = (value: unknown, number: ChannelNumber): unknown => {
   if (typeof value === 'string') {
     return value === NUMBER_PLACEHOLDER ? number : value.replaceAll(NUMBER_PLACEHOLDER, String(number));
   }
@@ -199,7 +222,7 @@ const fillNumber = (value: unknown, number: number): unknown => {
  * @param config Validated card config.
  * @param number Channel number to switch to.
  */
-export const switchServiceCall = (config: TvGuideConfig, number: number): ServiceCall => {
+export const switchServiceCall = (config: TvGuideConfig, number: ChannelNumber): ServiceCall => {
   const [domain = '', service = ''] = config.switch_action.perform_action.split('.');
   const data = fillNumber(config.switch_action.data ?? {}, number) as Record<string, unknown>;
   return { domain, service, data };

@@ -12,6 +12,7 @@ import {
   switchServiceCall,
   validateConfig,
   type ChannelConfig,
+  type ChannelNumber,
   type SectionConfig,
   type SwitchAction,
   type TvGuideConfig,
@@ -94,8 +95,8 @@ export class TvGuide extends LitElement {
   @state() private nowMs = Date.now();
   @state() private query = '';
   @state() private results?: SearchResults;
-  @state() private activeNumber?: number;
-  @state() private switchingNumber?: number;
+  @state() private activeNumber?: ChannelNumber;
+  @state() private switchingNumber?: ChannelNumber;
   @state() private details?: Details;
 
   private hassObject?: HomeAssistant;
@@ -262,7 +263,7 @@ export class TvGuide extends LitElement {
   }
 
   /** The first channel with this number. */
-  private channelByNumber(number: number): ChannelConfig | undefined {
+  private channelByNumber(number: ChannelNumber): ChannelConfig | undefined {
     return this.channels().find((channel) => channel.number === number);
   }
 
