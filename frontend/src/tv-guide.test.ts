@@ -184,6 +184,19 @@ test('tvg-switch calls the switch action and marks the row for 1.6 seconds', asy
   expect(text(el)).not.toContain('Switching to');
 });
 
+test('the switching feedback does not stay when the card is detached and attached again', async () => {
+  const { el } = await mount();
+  $<HTMLElement>(rowOf(el, 3)?.shadowRoot, '.zap')?.click();
+  await settle(el);
+  expect(text(el)).toContain('Switching to 3 Polsat');
+
+  el.remove();
+  document.body.append(el);
+  await settle(el);
+  expect($(rowOf(el, 3)?.shadowRoot, '.zap.switching')).toBeNull();
+  expect(text(el)).not.toContain('Switching to');
+});
+
 test('a text channel number such as 5.1 is shown, switched to and opened as it is', async () => {
   const config = { ...CONFIG, sections: [{ channels: [{ number: '5.1', name: 'KQED', epg_id: 'TVN' }] }] };
   const { el, callService } = await mount(makeHass(), config);

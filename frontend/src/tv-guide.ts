@@ -174,10 +174,14 @@ export class TvGuide extends LitElement {
     this.startRefreshing();
   }
 
-  /** Stops the timers and the running search. A card that is off the page makes no requests. */
+  /**
+   * Stops the timers and the running search. A card that is off the page makes no requests.
+   * The switching feedback ends with its timer, so it cannot stay on after the card comes back.
+   */
   disconnectedCallback(): void {
     this.stopRefreshing();
     clearTimeout(this.switchTimer);
+    this.switchingNumber = undefined;
     this.runner?.cancel();
     super.disconnectedCallback();
   }
