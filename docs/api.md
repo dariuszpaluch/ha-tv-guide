@@ -60,7 +60,7 @@ Used by `search` and `airings`. Normalized text = lower case, Unicode `NFKD` wit
 
 ## WebSocket commands
 
-Every command takes an optional `entry_id: string`. Without it, the first `tv_guide` entry is used.
+Every command takes an optional `entry_id: string`. Without it, the first loaded `tv_guide` entry is used. If none is loaded, the answer is `not_loaded` when an entry exists.
 
 Errors (`connection.send_error`):
 
