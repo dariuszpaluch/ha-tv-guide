@@ -433,7 +433,10 @@ const renderProgrammeView = () => {
 };
 /** Later programmes with the same title: this channel first, then the other channels; soonest first in each. */
 const AIRINGS_LIMIT = 20;
+/* Short programmes (weather, news flashes) have generic titles that match unrelated programmes. */
+const AIRINGS_MIN_MINUTES = 15;
 const airingsOf = (ch, p) => {
+  if (p.stop - p.start < AIRINGS_MIN_MINUTES * 6e4) return { same: [], others: [] };
   const title = normalize(p.title);
   const later = (c) => c.progs.filter((x) => x.start > now() && x.start !== p.start && normalize(x.title) === title).map((x) => ({ ch: c, p: x }));
   const same = later(ch);
