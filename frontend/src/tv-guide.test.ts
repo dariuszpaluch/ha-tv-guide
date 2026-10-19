@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+import { validateConfig } from './config';
 import { tvDayRange } from './data/time';
 import { NOW, WAW, channels, fakty, faktyDay3, faktyPolsat, faktyTomorrow, mecz, sport, uwagaTomorrow, zycie } from './test/fixtures';
 import type { Programme } from './types/api';
 import type { HomeAssistant } from './types/hass';
 import './tv-guide';
-import { registerCard, type TvGuide } from './tv-guide';
+import { registerCard, TvGuide } from './tv-guide';
 
 vi.mock('./utils/logo-tone', () => ({ measureLogo: vi.fn(() => 'mixed') }));
 
@@ -582,4 +583,11 @@ test('the card is registered once in window.customCards', () => {
   expect(entries).toHaveLength(1);
   expect(entries[0]?.name).toBe('TV guide');
   expect(entries[0]?.description).not.toBe('');
+});
+
+test('getStubConfig gives a valid config for the card picker', () => {
+  const stub = TvGuide.getStubConfig();
+  expect(() => validateConfig(stub)).not.toThrow();
+  expect(stub.sections).toHaveLength(1);
+  expect(stub.sections[0]?.channels).toHaveLength(1);
 });
