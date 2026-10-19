@@ -27,5 +27,6 @@ First release.
 - Age ratings such as `PG-13` show as the guide gives them.
 - Search folds `ß`, `ı`, `ø`, `đ`, `æ` and `œ`, so it works for more languages.
 - English and Polish.
+- A channel you select in the integration options shows its guide within a minute, without a page reload.
 - Accepts the layout, visibility and `card_mod` keys that Home Assistant adds to a card config.
 - Follows the Home Assistant theme, time zone and time format (12 or 24 hour).

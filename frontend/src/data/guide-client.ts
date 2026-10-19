@@ -65,9 +65,9 @@ export class GuideClient {
     return this.send<GuideInfo>('tv_guide/info');
   }
 
-  /** The selected channels. Cached for the session. */
+  /** The selected channels. Never cached: the card asks on every refresh, so a changed selection shows up. */
   channels(): Promise<Channel[]> {
-    return this.cached('channels', Infinity, () => this.send<Channel[]>('tv_guide/channels'));
+    return this.send<Channel[]>('tv_guide/channels');
   }
 
   /** The programme on air for each channel. Cached for 60 s; `force` skips the cache. */

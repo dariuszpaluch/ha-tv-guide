@@ -44,13 +44,13 @@ describe('GuideClient', () => {
     expect(sent).toEqual([{ type: 'tv_guide/info' }]);
   });
 
-  test('channels are cached for the session', async () => {
+  test('channels are asked again every time, so a changed selection shows up', async () => {
     const { connection, sent } = fakeConnection(() => channels);
     const client = new GuideClient(connection, undefined, clock);
     await expect(client.channels()).resolves.toEqual(channels);
-    time += 24 * 3600 * SECOND;
+    time += 60 * SECOND;
     await client.channels();
-    expect(sent).toEqual([{ type: 'tv_guide/channels' }]);
+    expect(sent).toEqual([{ type: 'tv_guide/channels' }, { type: 'tv_guide/channels' }]);
   });
 
   test('now is cached for 60 s and force skips the cache', async () => {

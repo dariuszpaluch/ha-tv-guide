@@ -222,7 +222,7 @@ export class TvGuide extends LitElement {
 
   /**
    * Loads the guide state and what is on now, all at once, so a failing request does not hold back the others.
-   * The client caches the channels for the session.
+   * The channels are asked every time, so a change of the selection in the integration shows up.
    * A failure shows a message; the next tick tries again, so the card recovers when the integration is ready.
    */
   private async refresh(): Promise<void> {

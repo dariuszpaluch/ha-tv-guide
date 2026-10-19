@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { validateConfig } from './config';
 import { tvDayRange } from './data/time';
 import { NOW, WAW, channels, fakty, faktyDay3, faktyPolsat, faktyTomorrow, mecz, sport, uwagaTomorrow, zycie } from './test/fixtures';
-import type { Programme } from './types/api';
+import type { Channel, Programme } from './types/api';
 import type { HomeAssistant } from './types/hass';
 import './tv-guide';
 import { registerCard, TvGuide } from './tv-guide';
@@ -37,6 +37,7 @@ const makeServer = () => {
     /** Message types whose answers wait for `release`. */
     hold: new Set<string>(),
     held: [] as { message: Record<string, unknown>; resolve: (answer?: unknown) => void }[],
+    channels: channels as Channel[],
     info: { last_success: '2026-10-19T18:00:00+02:00', update_interval: 12 },
     search: { now: [fakty] as Programme[], later: [faktyPolsat] as Programme[] },
     airings: [] as Programme[],
@@ -52,7 +53,7 @@ const makeServer = () => {
         case 'tv_guide/info':
           return server.info;
         case 'tv_guide/channels':
-          return channels;
+          return server.channels;
         case 'tv_guide/now':
           return server.now;
         case 'tv_guide/schedule': {
@@ -154,13 +155,13 @@ test('a row uses the guide icon, and the config logo when there is one', async (
   expect(rowOf(el, 1)?.logo).toBeUndefined();
 });
 
-test('asks for the channels once and for now every 60 seconds', async () => {
+test('asks for the channels and for now every 60 seconds', async () => {
   const { el, server } = await mount();
   expect(server.requests('tv_guide/channels')).toHaveLength(1);
   expect(server.requests('tv_guide/now')).toHaveLength(1);
   await vi.advanceTimersByTimeAsync(60 * 1000);
   await settle(el);
-  expect(server.requests('tv_guide/channels')).toHaveLength(1);
+  expect(server.requests('tv_guide/channels')).toHaveLength(2);
   expect(server.requests('tv_guide/now')).toHaveLength(2);
 });
 
@@ -275,6 +276,26 @@ test('a channel whose guide id the integration does not keep says it is not sele
   expect($($(el.shadowRoot, 'tvg-channel-view')?.shadowRoot, '.no-guide')?.textContent).toBe(
     'This channel is not selected in the TV guide integration. Select it in the integration options.',
   );
+});
+
+test('a channel that becomes selected on the server stops saying it is not selected after the next refresh', async () => {
+  const config = {
+    ...CONFIG,
+    sections: [{ channels: [{ number: 7, name: 'TVP 2', epg_id: 'TVP 2' }, { number: 5, name: 'TVN', epg_id: 'TVN' }] }],
+  };
+  const { el, server } = await mount(makeHass(), config);
+  expect($(rowOf(el, 7)?.shadowRoot, '.now .title')?.textContent).toBe('Not selected in the integration');
+
+  server.channels = [...channels, { id: 'TVP 2', name: 'TVP 2', icon: null }];
+  server.now = { ...server.now, 'TVP 2': sport };
+  await vi.advanceTimersByTimeAsync(60 * 1000);
+  await settle(el);
+  expect($(rowOf(el, 7)?.shadowRoot, '.now .title')?.textContent).not.toBe('Not selected in the integration');
+
+  $<HTMLElement>(rowOf(el, 7)?.shadowRoot, '.info')?.click();
+  await settle(el);
+  const view = $(el.shadowRoot, 'tvg-channel-view');
+  expect($(view?.shadowRoot, '.no-guide')?.textContent ?? '').not.toContain('not selected');
 });
 
 test('the older schedule answer is dropped when another channel was opened meanwhile', async () => {
