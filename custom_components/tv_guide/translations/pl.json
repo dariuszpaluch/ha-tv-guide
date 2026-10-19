@@ -1,0 +1,45 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Źródło przewodnika TV",
+        "description": "Podaj adres pliku XMLTV. Plik może być zwykłym XML, gzip, xz lub zip.",
+        "data": {
+          "url": "Adres XMLTV"
+        }
+      },
+      "channels": {
+        "title": "Kanały",
+        "description": "Wybierz kanały, które mają być w przewodniku.",
+        "data": {
+          "channels": "Kanały"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Nie można pobrać pliku. Sprawdź adres.",
+      "invalid_guide": "Plik nie jest poprawnym przewodnikiem XMLTV.",
+      "no_channels": "Wybierz co najmniej jeden kanał."
+    },
+    "abort": {
+      "already_configured": "Ten adres jest już skonfigurowany."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Opcje przewodnika TV",
+        "data": {
+          "channels": "Kanały",
+          "update_interval": "Odstęp aktualizacji (godziny)"
+        }
+      }
+    },
+    "error": {
+      "no_channels": "Wybierz co najmniej jeden kanał."
+    },
+    "abort": {
+      "not_loaded": "Przewodnik nie jest jeszcze wczytany. Spróbuj, gdy integracja działa."
+    }
+  }
+}

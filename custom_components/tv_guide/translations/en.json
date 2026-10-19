@@ -1,0 +1,45 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "TV guide source",
+        "description": "Enter the address of an XMLTV file. The file can be plain XML, gzip, xz or zip.",
+        "data": {
+          "url": "XMLTV address"
+        }
+      },
+      "channels": {
+        "title": "Channels",
+        "description": "Choose the channels to keep in the guide.",
+        "data": {
+          "channels": "Channels"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Cannot download the file. Check the address.",
+      "invalid_guide": "The file is not a valid XMLTV guide.",
+      "no_channels": "Choose at least one channel."
+    },
+    "abort": {
+      "already_configured": "This address is already set up."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "TV guide options",
+        "data": {
+          "channels": "Channels",
+          "update_interval": "Update interval (hours)"
+        }
+      }
+    },
+    "error": {
+      "no_channels": "Choose at least one channel."
+    },
+    "abort": {
+      "not_loaded": "The guide is not loaded yet. Try again when the integration works."
+    }
+  }
+}

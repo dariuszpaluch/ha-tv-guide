@@ -1,0 +1,13 @@
+{
+  "domain": "tv_guide",
+  "name": "TV guide",
+  "codeowners": ["@dariuszpaluch"],
+  "config_flow": true,
+  "dependencies": ["http", "frontend"],
+  "documentation": "https://github.com/dariuszpaluch/ha-tv-guide",
+  "integration_type": "service",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/dariuszpaluch/ha-tv-guide/issues",
+  "requirements": [],
+  "version": "0.1.0"
+}
