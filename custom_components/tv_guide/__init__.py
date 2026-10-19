@@ -50,7 +50,10 @@ async def _async_setup_card(hass: HomeAssistant) -> None:
     HA cannot register a static path for a missing folder, so skip the card then.
     """
     if not await hass.async_add_executor_job(CARD_FOLDER.is_dir):
-        _LOGGER.warning("The card is not built: %s is missing, so the TV guide card is not served", CARD_FOLDER)
+        _LOGGER.warning(
+            "The TV guide card is not served: %s is missing. Install the release zip or run 'pnpm build'",
+            CARD_FOLDER,
+        )
         return
     version = (await async_get_integration(hass, DOMAIN)).version
     await hass.http.async_register_static_paths(

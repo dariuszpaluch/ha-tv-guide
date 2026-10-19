@@ -8,10 +8,9 @@ jobs:
   integration:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
-        with:
-          python-version-file: pyproject.toml
+      - uses: actions/checkout@v7
+      # uv reads `requires-python` from pyproject.toml and installs a matching Python.
+      - uses: astral-sh/setup-uv@v10.3.0
       - run: uv sync
       - run: uv run pytest
       - run: uv run ruff check .
@@ -23,12 +22,12 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
         with:
           version: 12
           package_json_file: frontend/package.json
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: pnpm

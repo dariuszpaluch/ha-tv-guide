@@ -1,7 +1,6 @@
 """The integration serves the built card and tells the HA frontend to load it."""
 
 import logging
-from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
@@ -15,20 +14,23 @@ from custom_components.tv_guide.const import DOMAIN
 
 CARD_PATH = "/tv_guide_frontend/tv-guide.js"
 CARD_URL = f"{CARD_PATH}?v=0.1.0"
-FRONTEND_FOLDER = Path(tv_guide.__file__).parent / "frontend"
 
 
 @pytest.fixture
-def dummy_card() -> Iterator[Path]:
-    """Write a dummy card into the integration folder, which has no build in tests. Remove it afterwards."""
-    folder_existed = FRONTEND_FOLDER.exists()
-    FRONTEND_FOLDER.mkdir(exist_ok=True)
-    card = FRONTEND_FOLDER / "tv-guide.js"
+def card_folder(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Point the integration at a temporary card folder, so a real local build is never touched."""
+    folder = tmp_path / "frontend"
+    monkeypatch.setattr(tv_guide, "CARD_FOLDER", folder)
+    return folder
+
+
+@pytest.fixture
+def dummy_card(card_folder: Path) -> Path:
+    """A dummy built card in the temporary card folder."""
+    card_folder.mkdir()
+    card = card_folder / "tv-guide.js"
     card.write_text("console.log('tv-guide');")
-    yield card
-    card.unlink()
-    if not folder_existed:
-        FRONTEND_FOLDER.rmdir()
+    return card
 
 
 async def test_card_js_served(hass: HomeAssistant, hass_client: ClientSessionGenerator, dummy_card: Path) -> None:
@@ -49,13 +51,16 @@ async def test_extra_js_url_added(hass: HomeAssistant, dummy_card: Path) -> None
     assert CARD_URL in hass.data[DATA_EXTRA_MODULE_URL].urls
 
 
-async def test_missing_build_is_skipped(hass: HomeAssistant, caplog: pytest.LogCaptureFixture) -> None:
+async def test_missing_build_is_skipped(
+    hass: HomeAssistant, card_folder: Path, caplog: pytest.LogCaptureFixture
+) -> None:
     """Without a build the setup still works: nothing is served and no URL is added."""
-    assert not FRONTEND_FOLDER.exists()
+    assert not card_folder.exists()
 
     with caplog.at_level(logging.WARNING):
         assert await async_setup_component(hass, DOMAIN, {})
 
     assert CARD_URL not in hass.data[DATA_EXTRA_MODULE_URL].urls
-    warnings = [r for r in caplog.records if r.levelno == logging.WARNING and "card" in r.getMessage()]
+    warnings = [r for r in caplog.records if r.name == tv_guide.__name__ and r.levelno == logging.WARNING]
     assert len(warnings) == 1
+    assert "release zip" in warnings[0].getMessage()
