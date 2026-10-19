@@ -8,10 +8,13 @@ from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
 import pytest
+from freezegun.api import FrozenDateTimeFactory
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
+from homeassistant.setup import async_setup_component
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
+from pytest_homeassistant_custom_component.typing import MockHAClientWebSocket, WebSocketGenerator
 
 from custom_components.tv_guide.const import DOMAIN
 from custom_components.tv_guide.model import Guide
@@ -69,3 +72,25 @@ async def loaded_entry(
     await hass.async_block_till_done()
     assert mock_entry.state is ConfigEntryState.LOADED
     return mock_entry
+
+
+@pytest.fixture
+def clock_at_now(freezer: FrozenDateTimeFactory) -> FrozenDateTimeFactory:
+    """Freeze the clock at `NOW`."""
+    freezer.move_to(NOW)
+    return freezer
+
+
+@pytest.fixture
+async def ws(
+    hass: HomeAssistant, clock_at_now: FrozenDateTimeFactory, hass_ws_client: WebSocketGenerator
+) -> MockHAClientWebSocket:
+    """A WebSocket client with the commands registered and the clock at `NOW`.
+
+    The clock must stop before `hass_ws_client` runs: it signs an access token with the
+    current time, and a token issued "in the future" is rejected.
+    Home Assistant sets the integration up only when an entry exists, so the fixture does it
+    explicitly: the "no entry" tests need the commands without any entry.
+    """
+    assert await async_setup_component(hass, DOMAIN, {})
+    return await hass_ws_client(hass)

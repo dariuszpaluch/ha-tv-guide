@@ -1,9 +1,21 @@
 """TV guide for Home Assistant."""
 
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers.typing import ConfigType
 
+from .const import DOMAIN
 from .coordinator import TvGuideConfigEntry, TvGuideCoordinator
 from .store import GuideStore
+from .websocket_api import async_register_commands
+
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
+
+
+async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
+    """Register the WebSocket commands once. They serve every entry."""
+    async_register_commands(hass)
+    return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: TvGuideConfigEntry) -> bool:
