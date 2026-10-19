@@ -134,6 +134,10 @@ describe('whenText and formatDuration', () => {
     expect(whenText(uwagaTomorrow, NOW, '2026-10-19', 'pl-PL', WAW, false, 5, tPl)).toBe('Jutro, 19:55');
     expect(formatDuration(197, tPl)).toBe('3 godz. 17 min');
   });
+  test('a programme that starts in under a minute says in 1 min, not 0', () => {
+    const almost = Date.parse(sport.start) - 20e3;
+    expect(whenText(sport, almost, '2026-10-19', 'en-GB', WAW, false, 5, tEn)).toBe('In 1 min');
+  });
   test('a finished programme is ended', () => {
     const later = Date.parse('2026-10-19T19:40:00+02:00');
     expect(whenText(fakty, later, '2026-10-19', 'en-GB', WAW, false, 5, tEn)).toBe('Ended');
