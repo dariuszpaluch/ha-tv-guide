@@ -2,7 +2,7 @@
 
 The integration (`custom_components/tv_guide`) and the card (`frontend/`) talk only through this contract. Change it here first, in its own commit, then change both sides.
 
-Times are ISO 8601 strings with an offset. Lists of programmes are sorted by `start`.
+Times in output are ISO 8601 strings with the offset of the source. Times in input are ISO 8601 strings with an offset or `Z`. Lists of programmes are sorted as each command says.
 
 ## Types
 
@@ -37,7 +37,7 @@ Times are ISO 8601 strings with an offset. Lists of programmes are sorted by `st
 
 | Field | Rule |
 | --- | --- |
-| `id` | `<channel_id>\|<start in UTC, YYYY-MM-DDTHH:MM:SSZ>` |
+| `id` | `<channel_id>\|<start in UTC, YYYY-MM-DDTHH:MM:SSZ>`. When the source has two programmes with the same start on one channel, the first one is kept. |
 | `title` | Never empty. A programme without a title is dropped at parse time. |
 | `subtitle`, `description`, `episode`, `rating`, `star_rating`, `year` | String or `null`. |
 | `episode` | The `onscreen` episode number if there is one, else the first one. |
@@ -49,22 +49,26 @@ Times are ISO 8601 strings with an offset. Lists of programmes are sorted by `st
 ### Guide info
 
 ```json
-{ "last_update": "2026-10-19T14:00:05+02:00", "last_success": "2026-10-19T14:00:05+02:00", "update_interval": 12 }
+{ "last_success": "2026-10-19T14:00:05+02:00", "update_interval": 12 }
 ```
 
-`last_success` is `null` when no guide was ever loaded. `update_interval` is in hours.
+`last_success`: time of the last good download. `update_interval`: hours.
+
+## Title matching
+
+Used by `search` and `airings`. Normalized text = lower case, Unicode `NFKD` without combining marks, `ł` -> `l`, outer whitespace removed.
 
 ## WebSocket commands
 
-Every command takes an optional `entry_id`. Without it, the first loaded `tv_guide` entry is used.
+Every command takes an optional `entry_id: string`. Without it, the first `tv_guide` entry is used.
 
 Errors (`connection.send_error`):
 
 | Code | When |
 | --- | --- |
-| `not_found` | No loaded entry with this `entry_id`, or no `tv_guide` entry at all. |
-| `not_loaded` | The entry exists but has no guide yet (first download not done). |
-| `invalid_format` | Bad input (HA schema validation). |
+| `not_found` | There is no `tv_guide` entry, or no entry with this `entry_id`. |
+| `not_loaded` | The entry exists but is not loaded yet (for example, HA retries the setup because the first download failed and no stored guide exists). |
+| `invalid_format` | Bad input: HA schema validation, a time that cannot be parsed, or a query shorter than 2 characters after trimming. |
 
 ### `tv_guide/info`
 
@@ -77,30 +81,42 @@ Input: none. Output: `Channel[]` of the selected channels, sorted by name.
 ### `tv_guide/now`
 
 Input: `channel_ids: string[]`.
-Output: `{ "<channel_id>": { "current": Programme | null, "next": Programme | null } }`. A channel id that is not in the guide is in the output with both values `null`.
+Output: `{ "<channel_id>": Programme | null }`: the programme on air now (`start <= now < stop`). A channel id that is not in the guide is in the output with `null`.
 
 ### `tv_guide/schedule`
 
 Input: `channel_id: string`, `start: string`, `end: string`.
-Output: `Programme[]` that overlap `[start, end)`. Unknown channel: empty list.
+Output: `Programme[]` that overlap `[start, end)`, sorted by start. Unknown channel: empty list.
 
 ### `tv_guide/search`
 
-Input: `query: string` (at least 2 characters after trim), `channel_ids: string[]`, `when: "now" | "later"`, `limit: int` (1-100, default 40).
+Input: `query: string`, `channel_ids: string[]`, `when: "now" | "later"`, `limit: int` (1-100, default 40).
 Output: `Programme[]`.
 
-- Matching: the normalized query is a substring of the normalized title. Normalized = lower case, Unicode `NFKD` without combining marks, and `ł` -> `l`.
-- `now`: programmes on air now (`start <= now < stop`), sorted by channel order of `channel_ids`.
+- Match: the normalized query is a substring of the normalized title.
+- `now`: programmes on air now, in the order of `channel_ids`.
 - `later`: programmes with `start > now`, soonest first, only the first one per channel and title.
+
+### `tv_guide/airings`
+
+Other airings of a programme with the same title, for the "More airings" list in the programme view.
+
+Input: `programme_id: string`, `channel_ids: string[]`, `limit: int` (1-50, default 20).
+Output: `Programme[]`.
+
+- Match: normalized title equal to the normalized title of the programme (equal, not a substring: "Fakty" does not match "Fakty po południu").
+- Only programmes with `start > now`, without the programme itself, on the programme's channel or on a channel in `channel_ids`.
+- Order: first the programme's channel, soonest first; then the other channels, soonest first.
+- Unknown `programme_id` (for example, the guide was refreshed): empty list.
 
 ## HTTP
 
 ### `GET /api/tv_guide/image/{image_id}/{size}`
 
-- `image_id`: first 32 hex characters of the SHA-256 of the source image URL.
-- `size`: `thumb` (336 px wide) or `large` (1200 px wide). JPEG.
-- No HA login needed (an `<img>` tag cannot send a token). Only ids of images in a loaded guide are served.
-- `200` with `Cache-Control: public, max-age=604800`; `404` for an unknown id or when the source fails and there is no copy on disk; `400` for an unknown size.
+- `image_id`: first 32 hex characters of the SHA-256 of the source image URL. Anything else: `404`.
+- `size`: `thumb` (336 px wide) or `large` (1200 px wide); never wider than the source. JPEG. Other sizes: `400`.
+- No HA login needed (an `<img>` tag cannot send a token). Only ids of images in a loaded guide are served; only `http` and `https` source URLs.
+- `200` with `Cache-Control: public, max-age=604800`; `404` for an unknown id, a broken image, or when the source fails and there is no copy on disk.
 
 ## Frontend file
 
