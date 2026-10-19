@@ -157,6 +157,18 @@ async def test_broken_image_404(hass, hass_client_no_auth, aioclient_mock, loade
     assert stored_files(hass) == []
 
 
+@pytest.mark.parametrize("image_format", ["BMP", "TIFF"])
+async def test_other_image_format_404(hass, hass_client_no_auth, aioclient_mock, loaded_entry, image_format):
+    """Only JPEG, PNG, GIF and WEBP are opened. Pillow knows many more formats."""
+    buffer = io.BytesIO()
+    Image.new("RGB", (30, 20), (10, 120, 200)).save(buffer, image_format)
+    aioclient_mock.get(POSTER_URL, content=buffer.getvalue())
+    client = await hass_client_no_auth()
+
+    assert (await client.get(THUMB_PATH)).status == 404
+    assert stored_files(hass) == []
+
+
 async def test_too_large_download_404(hass_client_no_auth, aioclient_mock, loaded_entry, monkeypatch):
     monkeypatch.setattr("custom_components.tv_guide.images.MAX_IMAGE_BYTES", 1024)
     aioclient_mock.get(POSTER_URL, content=b"x" * 2048)
