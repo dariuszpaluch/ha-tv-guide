@@ -68,6 +68,12 @@ test('channel row without programme shows No guide', async () => {
   expect($(el, 'tvg-progress')).toBeNull();
 });
 
+test('a channel not selected in the integration says so instead of No guide', async () => {
+  const el = await mount({ programme: null, notSelected: true });
+  expect($(el, '.now .title')?.textContent).toBe('Not selected in the integration');
+  expect($(el, 'tvg-progress')).toBeNull();
+});
+
 test('texts are translated', async () => {
   const el = await mount({ programme: null, t: tPl });
   expect($(el, '.now .title')?.textContent).toBe('Brak programu');

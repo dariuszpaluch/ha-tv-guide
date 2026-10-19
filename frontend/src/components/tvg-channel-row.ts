@@ -16,6 +16,8 @@ export class TvgChannelRow extends LitElement {
   /** Logo URL, already chosen by the parent: the config logo, or else the guide icon. */
   @property({ attribute: false }) logo?: string;
   @property({ attribute: false }) programme: Programme | null = null;
+  /** The integration does not keep this channel's guide id. */
+  @property({ attribute: false }) notSelected = false;
   /** Current time, in milliseconds. */
   @property({ attribute: false }) now = 0;
   @property({ attribute: false }) t!: Translate;
@@ -58,7 +60,7 @@ export class TvgChannelRow extends LitElement {
           <span class="name">${highlighted(channel.name, this.highlight)}</span>
           ${this.programme
             ? this.renderProgramme(this.programme)
-            : html`<span class="now"><span class="title">${t('noGuide')}</span></span>`}
+            : html`<span class="now"><span class="title">${t(this.notSelected ? 'notSelected' : 'noGuide')}</span></span>`}
         </span>
         ${renderChevron()}
       </button>

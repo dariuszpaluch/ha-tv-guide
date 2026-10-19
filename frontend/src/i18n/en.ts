@@ -9,6 +9,8 @@ export const en = {
   noMatch: (q: string) => `No channel or programme matches "${q}".`,
   noGuide: 'No guide',
   noGuideLong: 'No programme guide for this channel.',
+  notSelected: 'Not selected in the integration',
+  notSelectedLong: 'This channel is not selected in the TV guide integration. Select it in the integration options.',
   until: (time: string) => `until ${time}`,
   left: (d: string) => `${d} left`,
   in: (d: string) => `In ${d}`,

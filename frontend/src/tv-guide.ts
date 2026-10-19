@@ -18,6 +18,7 @@ import {
 } from './config';
 import { GuideClient, GuideError } from './data/guide-client';
 import { channelEntries, guideIcons, logoOf } from './data/logos';
+import { notSelected } from './data/selection';
 import { SearchRunner, firstResult, type SearchResults } from './data/search';
 import { formatLastSuccess, isStale } from './data/stale';
 import { overlapsDay } from './components/view-parts';
@@ -103,6 +104,8 @@ export class TvGuide extends LitElement {
   private refreshTimer?: ReturnType<typeof setInterval>;
   private switchTimer?: ReturnType<typeof setTimeout>;
   private icons = new Map<string, string>();
+  /** Guide ids the integration keeps; `undefined` until `tv_guide/channels` answered. */
+  @state() private keptIds?: Set<string>;
   /** Each counter makes the answers of older requests stale. */
   private refreshRun = 0;
   private scheduleRun = 0;
@@ -130,6 +133,7 @@ export class TvGuide extends LitElement {
     this.nowMap = undefined;
     this.loadError = undefined;
     this.icons = new Map();
+    this.keptIds = undefined;
     this.entries = channelEntries(config, this.icons);
     this.query = '';
     this.results = undefined;
@@ -234,6 +238,7 @@ export class TvGuide extends LitElement {
       ]);
       if (run !== this.refreshRun || client !== this.client) return;
       this.icons = guideIcons(guideChannels);
+      this.keptIds = new Set(guideChannels.map((channel) => channel.id));
       this.entries = channelEntries(config, this.icons);
       this.info = info;
       this.nowMap = nowMap;
@@ -536,6 +541,7 @@ export class TvGuide extends LitElement {
       .channel=${channel}
       .logo=${logoOf(channel, this.icons)}
       .programme=${(channel.epg_id === undefined ? undefined : this.nowMap?.[channel.epg_id]) ?? null}
+      .notSelected=${notSelected(channel, this.keptIds)}
       .now=${this.nowMs}
       .t=${t}
       .locale=${localeOf(language)}
@@ -632,7 +638,11 @@ export class TvGuide extends LitElement {
         .startHour=${config.tv_day_starts_at}
         .darkMode=${darkMode}
         .loading=${details.loading}
-        .error=${details.error ? t(loadErrorKey(details.error)) : ''}
+        .error=${details.error
+          ? t(loadErrorKey(details.error))
+          : notSelected(channel, this.keptIds)
+            ? t('notSelectedLong')
+            : ''}
       ></tvg-channel-view>
       ${programme
         ? html`<tvg-programme-view
