@@ -1,0 +1,143 @@
+"""Streaming XMLTV parser.
+
+The parser reads a stream element by element. The decompressed XML (about 100 MB for
+epg.ovh) is never in memory as one object, and only the selected channels are kept.
+"""
+
+from __future__ import annotations
+
+import xml.etree.ElementTree as ET
+from collections.abc import Iterator
+from datetime import datetime
+from typing import IO
+
+from .const import KEEP_ENDED
+from .model import Channel, Guide, Programme
+
+XMLTV_TIME_FORMAT = "%Y%m%d%H%M%S %z"
+ONSCREEN = "onscreen"
+YEAR_LENGTH = 4
+NO_AGE_LIMIT = "0"
+
+
+class ParseError(Exception):
+    """The source is not valid XMLTV."""
+
+
+def parse_channels(stream: IO[bytes]) -> list[Channel]:
+    """Return every channel of the source, for the config flow."""
+    return [_channel(e) for e in _elements(stream, "channel")]
+
+
+def parse_guide(stream: IO[bytes], channel_ids: set[str], now: datetime) -> Guide:
+    """Parse the programmes of the selected channels.
+
+    Programmes that ended more than `KEEP_ENDED` before `now`, programmes without a title and
+    a second programme with the same channel and start are dropped.
+    """
+    channels: dict[str, Channel] = {}
+    available: dict[str, str] = {}
+    found: dict[str, dict[datetime, Programme]] = {cid: {} for cid in channel_ids}
+    oldest = now - KEEP_ENDED
+    for element in _elements(stream, "channel", "programme"):
+        if element.tag == "channel":
+            channel = _channel(element)
+            available[channel.id] = channel.name
+            if channel.id in channel_ids:
+                channels[channel.id] = channel
+            continue
+        channel_id = element.get("channel", "")
+        if channel_id not in channel_ids:
+            continue
+        programme = _programme(element)
+        if programme and programme.stop >= oldest:
+            found[channel_id].setdefault(programme.start, programme)
+    return Guide(
+        channels=channels,
+        programmes={cid: sorted(found[cid].values(), key=lambda p: p.start) for cid in channels},
+        available_channels=available,
+        fetched_at=now,
+    )
+
+
+def _elements(stream: IO[bytes], *tags: str) -> Iterator[ET.Element]:
+    """Yield the finished elements with these tags, then free their memory.
+
+    Children of the root are cleared after use. Without that, the root would keep every
+    handled element and the memory would grow with the size of the file.
+    """
+    root: ET.Element | None = None
+    try:
+        for event, element in ET.iterparse(stream, events=("start", "end")):
+            if event == "start":
+                root = element if root is None else root
+                continue
+            if element.tag not in tags:
+                continue
+            yield element
+            if root is not None:
+                root.clear()
+    except ET.ParseError as error:
+        raise ParseError(f"Invalid XMLTV: {error}") from error
+
+
+def _channel(element: ET.Element) -> Channel:
+    channel_id = element.get("id", "")
+    icon = element.find("icon")
+    return Channel(
+        id=channel_id,
+        name=_text(element.find("display-name")) or channel_id,
+        icon=icon.get("src") if icon is not None else None,
+    )
+
+
+def _programme(element: ET.Element) -> Programme | None:
+    """Build a programme, or None when it has no title."""
+    title = _text(element.find("title"))
+    if not title:
+        return None
+    try:
+        start = datetime.strptime(element.get("start", ""), XMLTV_TIME_FORMAT)
+        stop = datetime.strptime(element.get("stop", ""), XMLTV_TIME_FORMAT)
+    except ValueError as error:
+        raise ParseError(f"Bad programme time: {error}") from error
+    icon = element.find("icon")
+    rating = _text(element.find("rating/value"))
+    year = _text(element.find("date"))
+    return Programme(
+        channel_id=element.get("channel", ""),
+        start=start,
+        stop=stop,
+        title=title,
+        subtitle=_text(element.find("sub-title")),
+        description=_text(element.find("desc")),
+        episode=_episode(element),
+        categories=tuple(t for c in element.findall("category") if (t := _text(c))),
+        image_url=icon.get("src") if icon is not None else None,
+        rating=None if rating == NO_AGE_LIMIT else rating,
+        star_rating=_text(element.find("star-rating/value")),
+        year=year[:YEAR_LENGTH] if year else None,
+        countries=tuple(c for e in element.findall("country") for c in _split_countries(_text(e))),
+    )
+
+
+def _episode(element: ET.Element) -> str | None:
+    """The `onscreen` episode number if there is one, else the first one."""
+    numbers = element.findall("episode-num")
+    onscreen = next((n for n in numbers if n.get("system") == ONSCREEN), None)
+    chosen = onscreen if onscreen is not None else (numbers[0] if numbers else None)
+    return _text(chosen)
+
+
+def _split_countries(text: str | None) -> list[str]:
+    """Split on commas and remove quotes: `"Maroko","USA"` gives Maroko and USA."""
+    if not text:
+        return []
+    return [name for part in text.split(",") if (name := part.strip().strip('"').strip())]
+
+
+def _text(element: ET.Element | None) -> str | None:
+    """Stripped text of an element, or None when it is missing or empty."""
+    if element is None or element.text is None:
+        return None
+    return element.text.strip() or None
