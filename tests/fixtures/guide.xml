@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<tv generator-info-name="test">
+  <channel id="TVN">
+    <display-name>TVN</display-name>
+    <icon src="http://img.example/tvn.png"/>
+  </channel>
+  <channel id="Polsat">
+    <display-name>Polsat</display-name>
+  </channel>
+  <channel id="Other">
+    <display-name>Other channel</display-name>
+  </channel>
+
+  <programme start="20261019190000 +0200" stop="20261019193500 +0200" channel="TVN">
+    <title lang="pl">Fakty</title>
+    <category lang="pl">program informacyjny</category>
+    <episode-num system="xmltv_ns">0.518.</episode-num>
+    <episode-num system="onscreen">E519</episode-num>
+    <icon src="https://img.example/fakty.jpg"/>
+    <rating system="MPAA"><value>12</value></rating>
+  </programme>
+  <programme start="20261019193500 +0200" stop="20261019194500 +0200" channel="TVN">
+    <title lang="pl">Sport</title>
+  </programme>
+  <programme start="20261019193500 +0200" stop="20261019195000 +0200" channel="TVN">
+    <title lang="pl">Sport bis</title>
+  </programme>
+  <programme start="20261019195000 +0200" stop="20261019195500 +0200" channel="TVN">
+    <title lang="pl">Info</title>
+  </programme>
+  <programme start="20261020190000 +0200" stop="20261020193500 +0200" channel="TVN">
+    <title lang="pl">Fakty</title>
+  </programme>
+  <programme start="20261020195000 +0200" stop="20261020195500 +0200" channel="TVN">
+    <title lang="pl">Info</title>
+  </programme>
+  <programme start="20261020195500 +0200" stop="20261020201500 +0200" channel="TVN">
+    <title lang="pl">Uwaga</title>
+  </programme>
+  <programme start="20261021190000 +0200" stop="20261021193500 +0200" channel="TVN">
+    <title lang="pl">Fakty</title>
+  </programme>
+
+  <programme start="20261017100000 +0200" stop="20261017110000 +0200" channel="Polsat">
+    <title lang="pl">Old</title>
+  </programme>
+  <programme start="20261019191500 +0200" stop="20261019200000 +0200" channel="Polsat">
+    <title lang="pl">Życie na fali</title>
+    <desc lang="pl">Opis &amp; więcej</desc>
+    <date>2016</date>
+    <country>"Maroko","USA"</country>
+    <rating system="MPAA"><value>0</value></rating>
+    <star-rating><value>6/10</value></star-rating>
+  </programme>
+  <programme start="20261019200000 +0200" stop="20261019220000 +0200" channel="Polsat">
+    <title lang="pl">Mecz (finał) *</title>
+  </programme>
+  <programme start="20261019220000 +0200" stop="20261019230000 +0200" channel="Polsat">
+    <title lang="pl"></title>
+  </programme>
+  <programme start="20261020070000 +0200" stop="20261020073000 +0200" channel="Polsat">
+    <title lang="pl">Fakty</title>
+  </programme>
+  <programme start="20261020160000 +0200" stop="20261020163000 +0200" channel="Polsat">
+    <title lang="pl">Fakty po południu</title>
+  </programme>
+  <programme start="20261025023000 +0200" stop="20261025021500 +0100" channel="Polsat">
+    <title lang="pl">Nocne kino</title>
+  </programme>
+  <programme start="20261025021500 +0100" stop="20261025030000 +0100" channel="Polsat">
+    <title lang="pl">Po kinie</title>
+  </programme>
+
+  <programme start="20261019190000 +0200" stop="20261019200000 +0200" channel="Other">
+    <title lang="pl">Ignored</title>
+  </programme>
+</tv>
