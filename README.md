@@ -57,11 +57,38 @@ sections:
 
 | Option | Default | Description |
 | --- | --- | --- |
-| `switch_action` | - | Action that switches the channel. `{number}` in `data` becomes the channel number. |
+| `switch_action` | - | Action that switches the channel. It takes `perform_action` and `data` only. `{number}` in `data` becomes the channel number. |
 | `sections` | - | Groups of channels in the list. Each channel: `number`, `name`, `epg_id`, optional `logo` and `logo_tile` (`dark` or `light`). |
 | `entry_id` | first guide | The `tv_guide` entry to use, when you have more than one guide. |
 | `tv_day_starts_at` | `5` | Hour when a TV day starts. Programmes after midnight belong to the evening before. |
-| `height` | `600px` | Height of the channel list. |
+| `height` | `600px` | Height of the whole card frame: the search box and the list. |
+
+#### Switch action
+
+`switch_action` takes `perform_action` and `data`. Put the entity in `data`, as `entity_id`. The `target:` key is not supported. For a remote or a media player:
+
+```yaml
+switch_action:
+  perform_action: remote.send_command
+  data:
+    entity_id: remote.living_room
+    command: "{number}"
+```
+
+```yaml
+switch_action:
+  perform_action: media_player.play_media
+  data:
+    entity_id: media_player.living_room_tv
+    media_content_type: channel
+    media_content_id: "{number}"
+```
+
+### Good to know
+
+- The card shows "The guide is not loaded yet." until the integration has downloaded the guide once. Then it works even when the source is down.
+- Channel logos from the guide are loaded by the browser straight from the server of the guide. If your Home Assistant uses https (for example Nabu Casa), the browser can block a plain `http` logo. For a safe and better look, set `logo` for each channel in the card config.
+- Use only a guide source you trust. The integration downloads the guide and the poster pictures that the guide points to.
 
 ## Development
 
