@@ -1,0 +1,6 @@
+{
+  "name": "TV guide",
+  "zip_release": true,
+  "filename": "tv_guide.zip",
+  "homeassistant": "2026.10.0"
+}

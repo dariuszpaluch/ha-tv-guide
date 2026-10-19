@@ -1,13 +1,17 @@
 """TV guide for Home Assistant."""
 
+import logging
 from datetime import datetime
 from pathlib import Path
 
+from homeassistant.components import frontend
+from homeassistant.components.http import StaticPathConfig
 from homeassistant.const import EVENT_HOMEASSISTANT_STOP
 from homeassistant.core import Event, HomeAssistant
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.typing import ConfigType
+from homeassistant.loader import async_get_integration
 
 from .const import DOMAIN
 from .coordinator import TvGuideConfigEntry, TvGuideCoordinator
@@ -22,14 +26,38 @@ from .images import (
 from .store import GuideStore
 from .websocket_api import async_register_commands
 
+_LOGGER = logging.getLogger(__name__)
+
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
+
+CARD_FOLDER = Path(__file__).parent / "frontend"
+CARD_URL_PATH = "/tv_guide_frontend"
+CARD_FILE = "tv-guide.js"
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
-    """Register the WebSocket commands and the poster view once. They serve every entry."""
+    """Register the WebSocket commands, the poster view and the card once. They serve every entry."""
     async_register_commands(hass)
     _setup_image_cache(hass)
+    await _async_setup_card(hass)
     return True
+
+
+async def _async_setup_card(hass: HomeAssistant) -> None:
+    """Serve the built card and ask the Home Assistant frontend to load it on every page.
+
+    The `frontend/` folder is build output. A dev checkout or a CI run has none:
+    HA cannot register a static path for a missing folder, so skip the card then.
+    """
+    if not await hass.async_add_executor_job(CARD_FOLDER.is_dir):
+        _LOGGER.warning("The card is not built: %s is missing, so the TV guide card is not served", CARD_FOLDER)
+        return
+    version = (await async_get_integration(hass, DOMAIN)).version
+    await hass.http.async_register_static_paths(
+        [StaticPathConfig(CARD_URL_PATH, str(CARD_FOLDER), cache_headers=False)]
+    )
+    # The version in the URL makes browsers fetch the new card after an update.
+    frontend.add_extra_js_url(hass, f"{CARD_URL_PATH}/{CARD_FILE}?v={version}")
 
 
 def _setup_image_cache(hass: HomeAssistant) -> None:

@@ -1,10 +1,8 @@
 """Shared test data. Later tasks add to this file; do not define a second copy."""
 
 import io
-from collections.abc import Iterator
 from datetime import datetime
 from pathlib import Path
-from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -29,13 +27,6 @@ URL = "http://src/guide.xml"
 @pytest.fixture(autouse=True)
 def _enable(enable_custom_integrations: None) -> None:
     """Let Home Assistant load the integration from `custom_components`."""
-
-
-@pytest.fixture(autouse=True)
-def _no_frontend() -> Iterator[None]:
-    """The manifest depends on `frontend`. Skip its setup: the `hass_frontend` package is not installed."""
-    with patch("homeassistant.components.frontend.async_setup", return_value=True):
-        yield
 
 
 @pytest.fixture
