@@ -23,5 +23,8 @@ First release.
 - A tap switches the channel with any Home Assistant action.
 - A channel that is not selected in the integration says so.
 - Example config with about 40 Polish channels (`examples/card.yaml`).
+- Channel numbers can be text, such as `5.1`.
+- Age ratings such as `PG-13` show as the guide gives them.
+- Search folds `ß`, `ı`, `ø`, `đ`, `æ` and `œ`, so it works for more languages.
 - English and Polish.
 - Follows the Home Assistant theme, time zone and time format (12 or 24 hour).

@@ -17,6 +17,16 @@ The card is in English and Polish and follows your Home Assistant theme, time fo
 - [HACS](https://hacs.xyz) (for the normal install).
 - A URL of an XMLTV guide, plain or compressed (`.gz`, `.xz`, `.zip`).
 
+## Outside Poland
+
+The integration works with any XMLTV guide. Nothing in it is tied to Poland.
+
+- Find a guide for your country, for example [xmltvfr.fr](https://xmltvfr.fr) for France, or build one with [iptv-org/epg](https://github.com/iptv-org/epg). Many IPTV providers give an XMLTV URL too, and the one you use in Kodi, Tvheadend or Jellyfin works here.
+- Channel numbers can be text, for example a US sub-channel: `number: "5.1"` (in quotes, so YAML keeps it as text).
+- Age ratings show as the guide gives them (`PG-13`, `FSK 12`). A plain number such as `12` shows as `12+`.
+- The card is in English and Polish. Other languages get English. Translations are welcome: add a file next to `frontend/src/i18n/en.ts`.
+- The example in [examples/card.yaml](examples/card.yaml) is for the Polish guide. For another guide, copy the channel ids from the integration's channel list.
+
 ## Install
 
 1. In HACS, open the menu → **Custom repositories**, add `https://github.com/dariuszpaluch/ha-tv-guide` with the type **Integration**.
@@ -58,7 +68,7 @@ sections:
 | Option | Default | Description |
 | --- | --- | --- |
 | `switch_action` | - | Action that switches the channel. It takes `perform_action` and `data` only. `{number}` in `data` becomes the channel number. |
-| `sections` | - | Groups of channels in the list. Each channel: `number`, `name`, `epg_id`, optional `logo` and `logo_tile` (`dark` or `light`). |
+| `sections` | - | Groups of channels in the list. Each channel: `number` (a whole number, or text in quotes such as `"5.1"`), `name`, `epg_id`, optional `logo` and `logo_tile` (`dark` or `light`). |
 | `entry_id` | first guide | The `tv_guide` entry to use, when you have more than one guide. |
 | `tv_day_starts_at` | `5` | Hour when a TV day starts. Programmes after midnight belong to the evening before. |
 | `height` | `600px` | Height of the whole card frame: the search box and the list. |
