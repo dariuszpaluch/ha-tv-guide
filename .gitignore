@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Node
+node_modules/
+frontend/coverage/
+
+# Build output: the card is built in CI and shipped in the release zip
+custom_components/tv_guide/frontend/
+
+# Editors and OS
+.DS_Store
+.idea/
+.vscode/
