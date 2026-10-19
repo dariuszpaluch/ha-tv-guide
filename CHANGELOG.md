@@ -8,6 +8,7 @@ First release.
 
 - Downloads an XMLTV guide, plain or compressed (`.gz`, `.xz`, `.zip`).
 - Reads the guide as a stream, so a large file does not fill the memory.
+- A programme without an end time ends when the next one starts. The channel name is the first display name that is not empty.
 - Keeps only the channels you select. The channel list shows the guide id when it is not the same as the name.
 - Stores the last good guide on disk. The card works when the source is down.
 - WebSocket API for the card: `info`, `channels`, `now`, `schedule`, `search` and `airings`.
