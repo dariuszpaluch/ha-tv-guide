@@ -73,14 +73,12 @@
   .zap .play { position: absolute; left: 10px; top: 50%; translate: 0 -50%; width: 26px; height: 26px; border-radius: 50%; background: var(--primary-color); color: #fff; display: grid; place-items: center; opacity: 0; scale: .6; transition: opacity .15s, scale .15s; }
   .zap .play svg { width: 16px; height: 16px; }
   @media (hover: hover) {
-    .zap:hover:not(:disabled) { background: var(--secondary-background-color); }
-    .zap:hover:not(:disabled) .play { opacity: 1; scale: 1; }
-    .zap:hover:not(:disabled) .number { opacity: 0; }
+    .zap:hover { background: var(--secondary-background-color); }
+    .zap:hover .play { opacity: 1; scale: 1; }
+    .zap:hover .number { opacity: 0; }
     .info:hover { background: var(--secondary-background-color); }
   }
-  .zap:active:not(:disabled) { background: var(--mark); }
-  .zap:disabled { cursor: not-allowed; }
-  .zap:disabled .number, .zap:disabled .logo { opacity: .4; }
+  .zap:active { background: var(--mark); }
   .zap.switching { background: var(--mark); }
   .zap.switching .play { opacity: 1; scale: 1; animation: pulse 1s ease-in-out infinite; }
   .zap.switching .number { opacity: 0; }
@@ -94,7 +92,6 @@
   .info .now .title { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .info .bar { margin-top: 3px; }
   .info .chev { color: var(--disabled-text-color); }
-  .row.off .info .name, .row.off .info .now { opacity: .55; }
   /* Programme search result: the programme is the main line. */
   .row.prog .info .name { font-size: 14.5px; line-height: 1.3; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
   .row.prog .info .now .title { color: var(--secondary-text-color); }
@@ -153,10 +150,19 @@
   .slot.live .t { color: var(--primary-color); font-weight: 500; }
   .slot.live .thumb { width: 112px; }
   .slot.live .bar { margin-top: 5px; }
+  .airings { padding: 4px 0 12px; border-top: 1px solid var(--divider-color); margin-top: 8px; }
+  .airings h4 { margin: 12px 16px 2px; font-size: 15px; font-weight: 500; }
+  .airings .grp { padding: 10px 16px 4px; font-size: 12.5px; font-weight: 500; color: var(--secondary-text-color); }
+  .air { display: flex; align-items: center; gap: 12px; width: 100%; padding: 8px 8px 8px 16px; border: 0; background: none; text-align: left; cursor: pointer; }
+  .air:hover { background: var(--secondary-background-color); }
+  .air .logo { width: 44px; height: 26px; }
+  .air .txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+  .air .when { font-weight: 500; }
+  .air .c { font-size: 12.5px; color: var(--secondary-text-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .air svg.i { color: var(--disabled-text-color); }
   .sheet .actions { padding: 10px 16px 14px; border-top: 1px solid var(--divider-color); flex: none; }
   .btn { display: flex; width: 100%; align-items: center; justify-content: center; gap: 8px; height: 46px; border-radius: 23px; border: 0; cursor: pointer; font-weight: 500; font-size: 15px; background: var(--primary-color); color: var(--text-primary-color); }
   .btn:disabled { background: var(--track); color: var(--secondary-text-color); cursor: not-allowed; }
-  .hint { font-size: 12.5px; color: var(--secondary-text-color); text-align: center; margin-top: 6px; }
   .toast { position: absolute; left: 50%; bottom: 20px; translate: -50%; z-index: 50; background: #323232; color: #fff; padding: 10px 16px; border-radius: 8px; font-size: 13.5px; white-space: nowrap; box-shadow: 0 3px 10px rgba(0,0,0,.3); }
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 </style>
@@ -192,6 +198,11 @@
       <button data-lang="pl" aria-pressed="false">Polski</button>
       <button data-lang="en" aria-pressed="false">English</button>
     </div>
+    <div class="theme-toggle clock-toggle" style="margin-right:8px" role="group" aria-label="Clock / Zegar">
+      <button data-clock="auto" aria-pressed="true">Auto (HA)</button>
+      <button data-clock="24" aria-pressed="false">24 h</button>
+      <button data-clock="12" aria-pressed="false">12 h</button>
+    </div>
     <div class="theme-toggle" role="group" aria-label="Theme / Motyw">
       <button data-theme="auto" aria-pressed="true">Auto</button>
       <button data-theme="dark" aria-pressed="false">Dark</button>
@@ -204,7 +215,6 @@
 <script>
 const { sections: SECTIONS } = window.MOCK;
 const CHANNELS = SECTIONS.flatMap((s) => s.channels);
-const UNAVAILABLE_DIGITS = ['7'];
 const TZ = 'Europe/Warsaw';
 const PROGRAMME_SEARCH_MIN = 2;
 const ICON = {
@@ -219,7 +229,17 @@ const icon = (n) => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const normalize = (t) => t.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ł/g, 'l');
 const now = () => Date.now();
-const hhmm = (ms) => new Date(ms).toLocaleTimeString(LOCALES[language()], { hour: '2-digit', minute: '2-digit', timeZone: TZ });
+/* Time format from the HA profile (hass.locale.time_format): "12", "24", "system" (device) or "language".
+   "language" is the HA default; the card uses en-GB / pl-PL, so it gives 24-hour times. */
+const HA_TIME_FORMAT = 'language';
+let clockMode = 'auto';
+const hour12 = () => {
+  const format = clockMode === 'auto' ? HA_TIME_FORMAT : clockMode;
+  if (format === '12') return true;
+  if (format === 'system') return new Intl.DateTimeFormat(undefined, { hour: 'numeric' }).resolvedOptions().hour12 ?? false;
+  return false;
+};
+const hhmm = (ms) => new Date(ms).toLocaleTimeString(LOCALES[language()], { hour: '2-digit', minute: '2-digit', hourCycle: hour12() ? 'h12' : 'h23', timeZone: TZ });
 /* TV day: programmes after midnight belong to the evening before, like in printed TV guides. */
 const DAY_STARTS_AT_HOUR = 5;
 const dayKey = (ms) => new Date(ms - DAY_STARTS_AT_HOUR * 36e5).toLocaleDateString('sv-SE', { timeZone: TZ });
@@ -240,7 +260,7 @@ const STRINGS = {
     until: (time) => `until ${time}`, left: (d) => `${d} left`, in: (d) => `In ${d}`, ended: 'Ended',
     hours: (h, m) => `${h} h ${m} min`, minutes: (m) => `${m} min`, today: 'Today', tomorrow: 'Tomorrow',
     earlier: (n) => `Show ${n} earlier`, switchTo: (n) => `Switch to ${n}`, switching: (n, name) => `Switching to ${n} ${name}`,
-    digitMissing: 'The remote has not learned digit 7 yet', close: 'Close', back: 'Back to the schedule',
+    moreAirings: 'More airings', showAll: (n) => `Show all (${n})`, onChannel: (name) => `On ${name}`, onOtherChannels: 'On other channels', close: 'Close', back: 'Back to the schedule',
     details: (name) => `Details for ${name}`, day: 'Day', sheet: 'Channel details',
   },
   pl: {
@@ -249,7 +269,7 @@ const STRINGS = {
     until: (time) => `do ${time}`, left: (d) => `jeszcze ${d}`, in: (d) => `Za ${d}`, ended: 'Zakończony',
     hours: (h, m) => `${h} godz. ${m} min`, minutes: (m) => `${m} min`, today: 'Dziś', tomorrow: 'Jutro',
     earlier: (n) => `Pokaż wcześniejsze (${n})`, switchTo: (n) => `Przełącz na ${n}`, switching: (n, name) => `Przełączam na ${n} ${name}`,
-    digitMissing: 'Pilot nie zna jeszcze cyfry 7', close: 'Zamknij', back: 'Wróć do ramówki',
+    moreAirings: 'Kolejne emisje', showAll: (n) => `Pokaż wszystkie (${n})`, onChannel: (name) => `Na ${name}`, onOtherChannels: 'Na innych kanałach', close: 'Zamknij', back: 'Wróć do ramówki',
     details: (name) => `Szczegóły: ${name}`, day: 'Dzień', sheet: 'Szczegóły kanału',
   },
 };
@@ -268,7 +288,6 @@ const t = (key, ...values) => {
   const entry = STRINGS[language()][key] ?? STRINGS.en[key];
   return typeof entry === 'function' ? entry(...values) : entry;
 };
-const isOff = (ch) => UNAVAILABLE_DIGITS.some((d) => String(ch.number).includes(d));
 const isLive = (p) => p.start <= now() && p.stop > now();
 const current = (ch) => ch.progs.find(isLive);
 const progress = (p) => Math.min(100, Math.max(0, ((now() - p.start) / (p.stop - p.start)) * 100));
@@ -337,12 +356,12 @@ const search = (q) => {
 
 /* ---------- rows ---------- */
 const zap = (ch) => `
-  <button class="zap ${state.switching === ch.number ? 'switching' : ''}" data-switch="${ch.number}" ${isOff(ch) ? `disabled title="${t('digitMissing')}"` : ''} aria-label="${t('switchTo', `${ch.number} ${esc(ch.name)}`)}">
+  <button class="zap ${state.switching === ch.number ? 'switching' : ''}" data-switch="${ch.number}" aria-label="${t('switchTo', `${ch.number} ${esc(ch.name)}`)}">
     <span class="play">${icon('play')}</span><span class="number tnum">${ch.number}</span>${logo(ch)}
   </button><span class="sep"></span>`;
 const channelRow = (ch, first, q = '') => {
   const p = current(ch);
-  return `<div class="row ${isOff(ch) ? 'off' : ''} ${state.active === ch.number ? 'active' : ''} ${first ? 'first' : ''}">${zap(ch)}
+  return `<div class="row ${state.active === ch.number ? 'active' : ''} ${first ? 'first' : ''}">${zap(ch)}
     <button class="info" data-details="${ch.number}" aria-label="${t('details', esc(ch.name))}">
       <span class="col"><span class="name">${highlight(ch.name, q)}</span>
       ${p ? `<span class="now"><span class="title">${esc(p.title)}</span><span class="tnum">${hhmm(p.stop)}</span></span><span class="bar"><i style="width:${progress(p)}%"></i></span>`
@@ -350,7 +369,7 @@ const channelRow = (ch, first, q = '') => {
       </span>${icon('chevron')}</button></div>`;
 };
 const programmeRow = ({ ch, p }, first, q) => `
-  <div class="row prog ${isOff(ch) ? 'off' : ''} ${state.active === ch.number ? 'active' : ''} ${first ? 'first' : ''}">${zap(ch)}
+  <div class="row prog ${state.active === ch.number ? 'active' : ''} ${first ? 'first' : ''}">${zap(ch)}
     <button class="info" data-details="${ch.number}" data-start="${p.start}" aria-label="${t('details', esc(p.title))}">
       <span class="col"><span class="name">${highlight(p.title, q)}</span>
       <span class="now"><span class="title">${esc(ch.name)}</span><span class="tnum">${isLive(p) ? t('until', hhmm(p.stop)) : whenText(p)}</span></span>
@@ -363,9 +382,7 @@ const metaChips = (p) => {
     p.year && `<span>${esc(p.year)}</span>`, p.country && `<span>${esc(p.country.replace(/"/g, '').replace(/,/g, ', '))}</span>`, p.stars && `<span>★ ${esc(p.stars)}</span>`].filter(Boolean);
   return bits.length ? `<div class="meta">${bits.join('')}</div>` : '';
 };
-const switchActions = (ch) => (isOff(ch)
-  ? `<button class="btn" disabled>${icon('play')} ${t('switchTo', ch.number)}</button><div class="hint">${t('digitMissing')}</div>`
-  : `<button class="btn" data-switch="${ch.number}">${icon('play')} ${t('switchTo', ch.number)}</button>`);
+const switchActions = (ch) => `<button class="btn" data-switch="${ch.number}">${icon('play')} ${t('switchTo', ch.number)}</button>`;
 const channelTitle = (ch) => `${logo(ch)}<div class="ch">${esc(ch.name)} <span>· ${ch.number}</span></div>`;
 /* Posters are full-size originals (~200 KB), so only the ones scrolled into view load. */
 const thumb = (p) => (p.icon
@@ -405,17 +422,52 @@ const renderProgrammeView = () => {
       <div class="sel">
         <h3>${esc(p.title)}</h3>
         ${p.sub || p.ep ? `<div class="sub">${esc([p.sub, p.ep].filter(Boolean).join(', '))}</div>` : ''}
-        <div class="timing tnum"><b>${sameDay ? '' : `${dayLabel(dayKey(p.start))}, `}${hhmm(p.start)} - ${hhmm(p.stop)}</b><span>${whenText(p)}</span></div>
+        <div class="timing tnum"><b>${sameDay ? '' : `${dayLabel(dayKey(p.start))}, `}${hhmm(p.start)} - ${hhmm(p.stop)}</b><span>${sameDay ? whenText(p) : ''}</span></div>
         ${isLive(p) ? `<div class="bar"><i style="width:${progress(p)}%"></i></div>` : ''}
         ${metaChips(p)}
         ${p.desc ? `<p class="desc">${esc(p.desc)}</p>` : ''}
       </div>
+      ${moreAirings(ch, p)}
     </div>
     <div class="actions">${switchActions(ch)}</div>`;
+};
+/** Later programmes with the same title: this channel first, then the other channels; soonest first in each. */
+const AIRINGS_LIMIT = 20;
+const airingsOf = (ch, p) => {
+  const title = normalize(p.title);
+  const later = (c) => c.progs.filter((x) => x.start > now() && x.start !== p.start && normalize(x.title) === title).map((x) => ({ ch: c, p: x }));
+  const same = later(ch);
+  const others = CHANNELS.filter((c) => c !== ch).flatMap(later).sort((a, b) => a.p.start - b.p.start);
+  return { same, others: others.slice(0, Math.max(0, AIRINGS_LIMIT - same.length)) };
+};
+const airingRow = ({ ch, p }, showChannel) => `
+  <button class="air" data-air-ch="${ch.number}" data-air-start="${p.start}">
+    ${showChannel ? logo(ch) : ''}
+    <span class="txt"><span class="when tnum">${dayLabel(dayKey(p.start))}, ${hhmm(p.start)}</span>
+      <span class="c">${esc([showChannel ? ch.name : '', p.sub, p.ep].filter(Boolean).join(' · '))}</span></span>
+    ${icon('chevron')}
+  </button>`;
+/* A daily series can have 20+ airings; each group shows the first few and folds the rest. */
+const AIRINGS_SHOWN = 3;
+const airingGroup = (key, title, items, showChannel) => {
+  if (!items.length) return '';
+  const open = state.open.airingsOpen?.[key];
+  const shown = open ? items : items.slice(0, AIRINGS_SHOWN);
+  return `<div class="grp">${title}</div>${shown.map((a) => airingRow(a, showChannel)).join('')}
+    ${!open && items.length > AIRINGS_SHOWN ? `<button class="earlier" data-air-more="${key}">${t('showAll', items.length)}</button>` : ''}`;
+};
+const moreAirings = (ch, p) => {
+  const { same, others } = airingsOf(ch, p);
+  if (!same.length && !others.length) return '';
+  return `<section class="airings"><h4>${t('moreAirings')}</h4>
+    ${airingGroup('same', t('onChannel', esc(ch.name)), same, false)}
+    ${airingGroup('others', t('onOtherChannels'), others, true)}
+  </section>`;
 };
 const sheet = () => root.querySelector('.sheet');
 const showProgramme = (start) => {
   state.open.start = start;
+  state.open.airingsOpen = {};
   renderProgrammeView();
   sheet().classList.add('prog-open');
   root.querySelector('.view.prog .scroll').scrollTop = 0;
@@ -446,7 +498,7 @@ const listEl = root.querySelector('.list');
 const firstResult = () => {
   const r = state.results;
   if (!state.q || !r) return null;
-  return [...r.channels, ...(r.now ?? []).map((m) => m.ch), ...(r.later ?? []).map((m) => m.ch)].find((c) => !isOff(c)) ?? null;
+  return [...r.channels, ...(r.now ?? []).map((m) => m.ch), ...(r.later ?? []).map((m) => m.ch)][0] ?? null;
 };
 const searching = () => `<div class="searching"><span class="spinner"></span>${t('searching')}</div>`;
 const render = () => {
@@ -490,6 +542,14 @@ root.addEventListener('click', (e) => {
     const scroll = root.querySelector('.view.channel .scroll'), top = scroll.scrollTop;
     state.open.showPast = true; renderChannelView(); root.querySelector('.view.channel .scroll').scrollTop = top; return;
   }
+  const more = e.target.closest('[data-air-more]');
+  if (more) {
+    const scroll = root.querySelector('.view.prog .scroll'), top = scroll.scrollTop;
+    state.open.airingsOpen = { ...state.open.airingsOpen, [more.dataset.airMore]: true };
+    renderProgrammeView(); root.querySelector('.view.prog .scroll').scrollTop = top; return;
+  }
+  const air = e.target.closest('[data-air-start]');
+  if (air) { openDetails(CHANNELS.find((c) => c.number === Number(air.dataset.airCh)), Number(air.dataset.airStart)); return; }
   const s = e.target.closest('.slot[data-start]');
   if (s) showProgramme(Number(s.dataset.start));
 });
@@ -592,6 +652,11 @@ document.querySelectorAll('.lang-toggle button').forEach((b) => b.addEventListen
 }));
 document.querySelector('.lang-toggle [data-lang="auto"]').textContent = `Auto (HA: ${HA_LANGUAGE})`;
 document.querySelectorAll('[data-notes]').forEach((n) => { n.hidden = n.dataset.notes !== language(); });
+document.querySelectorAll('[data-clock]').forEach((b) => b.addEventListener('click', () => {
+  clockMode = b.dataset.clock;
+  document.querySelectorAll('[data-clock]').forEach((o) => o.setAttribute('aria-pressed', String(o === b)));
+  rerenderAll();
+}));
 Promise.all([...new Set(CHANNELS.map((c) => c.logo).filter(Boolean))].map((src) => measure(src).then((tone) => tones.set(src, tone)))).then(render);
 applyTheme();
 </script>

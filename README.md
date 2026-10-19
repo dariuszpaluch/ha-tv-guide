@@ -9,7 +9,7 @@ It has two parts, installed together:
 - **Integration `tv_guide`** downloads a guide in the [XMLTV](https://wiki.xmltv.org/index.php/XMLTVFormat) format (for example [epg.ovh](https://epg.ovh) for Poland), keeps the channels you select, and answers the card. It keeps the last good guide and the posters on disk, so the card works when the source is down.
 - **Card `custom:tv-guide`**: channel list with the programme on now, a details sheet with the schedule for each day, programme details, and search.
 
-The card is in English and Polish and follows your Home Assistant theme.
+The card is in English and Polish and follows your Home Assistant theme, time format and time zone.
 
 ## Requirements
 
@@ -61,7 +61,6 @@ sections:
 | `sections` | - | Groups of channels in the list. Each channel: `number`, `name`, `epg_id`, optional `logo` and `logo_tile` (`dark` or `light`). |
 | `entry_id` | first guide | The `tv_guide` entry to use, when you have more than one guide. |
 | `tv_day_starts_at` | `5` | Hour when a TV day starts. Programmes after midnight belong to the evening before. |
-| `unavailable_digits` | `[]` | Channels with these digits cannot be switched to (for example, a remote that has not learned a digit yet). |
 | `height` | `600px` | Height of the channel list. |
 
 ## Development
