@@ -78,7 +78,7 @@ The phone never contacts the XMLTV source or the poster server.
 
 ### Guide cache
 
-- Stored with `Store` after each good download, filtered to the selected channels (about 2-3 MB of JSON).
+- Stored with `Store` after each good download, filtered to the selected channels (about 10 MB of JSON for 120 channels with descriptions).
 - At start: load the stored guide first, then download. The card has data at once. After a change of the channel selection, the stored guide is cut to the new selection. A new channel has no programmes until the download works. If no stored channel is selected any more, the setup waits for the download.
 - A failed download keeps the current guide and logs a warning. `tv_guide/info` reports `last_success`.
 
