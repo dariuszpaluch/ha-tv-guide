@@ -26,6 +26,21 @@ jobs:
         run: |
           pnpm install --frozen-lockfile
           pnpm build
+      # The card URL carries the manifest version. A new release must change it, or browsers keep the old card.
+      - name: Write the release tag into manifest.json
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          python3 - "${TAG#v}" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          path = Path("custom_components/tv_guide/manifest.json")
+          manifest = json.loads(path.read_text())
+          manifest["version"] = sys.argv[1]
+          path.write_text(json.dumps(manifest, indent=2) + "\n")
+          PY
       # HACS unpacks the zip into custom_components/tv_guide/, so manifest.json must sit at the zip root.
       - name: Zip the integration
         run: cd custom_components/tv_guide && zip -r ../../tv_guide.zip . -x '__pycache__/*'

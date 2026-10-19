@@ -183,7 +183,7 @@ export const whenText = (
   if (start <= now && stop > now) return t('left', formatDuration(Math.max(1, Math.round((stop - now) / MINUTE_MS)), t));
   if (stop <= now) return t('ended');
   const key = tvDayKey(start, timeZone, startHour);
-  if (key === todayKey) return t('in', formatDuration(Math.round((start - now) / MINUTE_MS), t));
+  if (key === todayKey) return t('in', formatDuration(Math.max(1, Math.round((start - now) / MINUTE_MS)), t));
   return `${dayLabel(key, todayKey, locale, t)}, ${formatTime(start, locale, timeZone, use12Hour)}`;
 };
 

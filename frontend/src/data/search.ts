@@ -19,6 +19,8 @@ export interface SearchResults {
 
 const PROGRAMME_SEARCH_MIN = 2;
 const LATER_LIMIT = 40;
+/** The most the server allows. A name that matches on many channels must not be cut. */
+const NOW_LIMIT = 100;
 
 const configChannels = (config: TvGuideConfig): ChannelConfig[] => config.sections.flatMap((section) => section.channels);
 
@@ -79,7 +81,7 @@ export class SearchRunner {
         (error: unknown) => finish({ [key]: [], error: errorCode(error) }),
       );
     };
-    step('now', this.search(text, ids, 'now'));
+    step('now', this.search(text, ids, 'now', NOW_LIMIT));
     step('later', this.search(text, ids, 'later', LATER_LIMIT));
   }
 

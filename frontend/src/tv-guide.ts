@@ -7,7 +7,15 @@ import './components/tvg-programme-view';
 import './components/tvg-search-box';
 import './components/tvg-sheet';
 import type { ChannelEntry } from './components/tvg-programme-view';
-import { channelIds, switchServiceCall, validateConfig, type ChannelConfig, type TvGuideConfig } from './config';
+import {
+  channelIds,
+  switchServiceCall,
+  validateConfig,
+  type ChannelConfig,
+  type SectionConfig,
+  type SwitchAction,
+  type TvGuideConfig,
+} from './config';
 import { GuideClient, GuideError } from './data/guide-client';
 import { channelEntries, guideIcons, logoOf } from './data/logos';
 import { SearchRunner, firstResult, type SearchResults } from './data/search';
@@ -100,6 +108,15 @@ export class TvGuide extends LitElement {
   private scheduleRun = 0;
   private airingsRun = 0;
   private translateCache?: { language: string; t: Translate };
+
+  /** The config HA puts into a card that the user adds from the picker. It passes `validateConfig`. */
+  static getStubConfig(): { type: string; switch_action: SwitchAction; sections: SectionConfig[] } {
+    return {
+      type: `custom:${CARD_TYPE}`,
+      switch_action: { perform_action: 'script.cable_box_go_to_channel', data: { channel: '{number}' } },
+      sections: [{ title: 'Main', channels: [{ number: 1, name: 'TVP 1 HD', epg_id: 'TVP 1' }] }],
+    };
+  }
 
   /** Called by Home Assistant with the card config. Throws the config error, which HA shows on the card. */
   setConfig(raw: unknown): void {

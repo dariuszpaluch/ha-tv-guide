@@ -39,6 +39,7 @@ IMAGE_FOLDER = ".cache/tv_guide/images"  # relative to the config folder; HA bac
 MAX_IMAGE_BYTES = 10 * 1024 * 1024
 DOWNLOAD_TIMEOUT = 20  # seconds
 MAX_IMAGE_PIXELS = 30_000_000  # Pillow's own limit is about 178 million: too much memory for a small device
+ALLOWED_FORMATS = ("JPEG", "PNG", "GIF", "WEBP")  # Pillow knows many more (such as EPS): the URL is foreign
 MAX_PARALLEL_DOWNLOADS = 4  # downloads and decodes running at once
 FAILURE_MEMORY = 5 * 60  # seconds a failed poster is not tried again
 JPEG_QUALITY = 80
@@ -64,7 +65,7 @@ def decode(data: bytes) -> Image.Image:
         InvalidImageError: the data is not a readable image, or it has too many pixels.
     """
     try:
-        with Image.open(io.BytesIO(data)) as source:
+        with Image.open(io.BytesIO(data), formats=ALLOWED_FORMATS) as source:
             # The size is known from the header. Check it before the pixels are decoded.
             if source.width * source.height > MAX_IMAGE_PIXELS:
                 raise InvalidImageError(f"Image of {source.width}x{source.height} pixels is too big")
