@@ -20,6 +20,7 @@ The mockup is the reference for layout, styles and behaviour: [mockup/design-a.s
 - **Details sheet, two views.**
   - Channel view: day chips, then the schedule for that day. Each programme has a small poster. The programme on now has a bigger poster, two lines of description and a progress bar. Earlier programmes of today are folded behind "Show N earlier".
   - Programme view: poster, title, time, time left or start time, category, age rating, year, country, star rating, description, switch button. It slides over the channel view.
+  - **More airings** below the description: other airings of programmes with the same title, soonest first, first on the same channel, then on the other channels of the card. Each row shows the day and time (and the channel logo and name for other channels). A tap opens that programme. Shown for every programme, not only for the one on now.
 - **Gestures.** Swipe right on the programme view goes back. Drag the grab bar or a header down to close the sheet. A drag is never also a tap.
 - **TV day** runs from 05:00 to 05:00 by default, like printed TV guides. No "yesterday": a cable box cannot play past programmes.
 - **Search in three steps.** Each step shows when it is ready; a newer query cancels an older one:
@@ -30,7 +31,8 @@ The mockup is the reference for layout, styles and behaviour: [mockup/design-a.s
   A result is a channel row or a programme row. A tap opens the channel details or the programme details. Enter switches to the first result. Programme search starts at 2 characters.
 - **Language** comes from the user's HA profile (`hass.locale.language`). Polish and English; any other language falls back to English. Day and time formats come from `Intl` with that locale.
 - **Theme** comes from HA: the card uses only HA theme variables (`--primary-color`, `--card-background-color`, ...). Dark mode for the logo tiles comes from `hass.themes.darkMode`.
-- **Logos** are shown only in a 52×30 box. A logo from the card config wins over the icon from the guide.
+- **Logos** are shown only in a 52×30 box. A logo from the card config wins over the icon from the guide (`tv_guide/channels`).
+- **Times** are always 24-hour: English uses the `en-GB` locale, Polish `pl-PL`.
 - **Stale guide.** When the last good download is older than two update intervals, the card shows "Guide from <date, time>" above the list.
 
 ### Backend
@@ -69,7 +71,8 @@ The phone never contacts the XMLTV source or the poster server.
 
 ### Parsing
 
-- Streaming parse with the standard library (`xml.etree.ElementTree.iterparse`), no extra requirement; only programmes of the selected channels are kept.
+- Streaming parse with the standard library (`xml.etree.ElementTree.iterparse`) straight from the decompressing stream, so the decompressed XML (about 100 MB for epg.ovh) is never in memory at once. Only programmes of the selected channels are kept; the names of all channels in the source are kept for the options flow.
+- Download limit: 64 MB compressed.
 - Programmes that ended more than 1 day ago are dropped. Programmes without a title are dropped.
 - The server knows nothing about TV days. The card sends the time range of the day it shows.
 
@@ -97,7 +100,7 @@ switch_action:               # HA action; {number} is replaced with the channel 
   data:
     channel: "{number}"
 tv_day_starts_at: 5          # hour, default 5
-unavailable_digits: ["7"]    # optional: channels with these digits cannot be switched to
+unavailable_digits: []       # optional: channels with these digits cannot be switched to
 height: 600px                # optional
 sections:
   - title: Main
