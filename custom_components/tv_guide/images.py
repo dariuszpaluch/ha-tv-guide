@@ -30,6 +30,7 @@ from homeassistant.util.hass_dict import HassKey
 from PIL import Image
 
 from .const import DOMAIN
+from .model import Guide
 from .source import SourceError, fetch_source
 
 _LOGGER = logging.getLogger(__name__)
@@ -37,6 +38,9 @@ _LOGGER = logging.getLogger(__name__)
 IMAGE_FOLDER = ".cache/tv_guide/images"  # relative to the config folder; HA backups skip `.cache/*`
 MAX_IMAGE_BYTES = 10 * 1024 * 1024
 DOWNLOAD_TIMEOUT = 20  # seconds
+MAX_IMAGE_PIXELS = 30_000_000  # Pillow's own limit is about 178 million: too much memory for a small device
+MAX_PARALLEL_DOWNLOADS = 4  # downloads and decodes running at once
+FAILURE_MEMORY = 5 * 60  # seconds a failed poster is not tried again
 JPEG_QUALITY = 80
 CACHE_CONTROL = "public, max-age=604800"
 UNUSED_FILE_MAX_AGE = timedelta(days=7)
@@ -53,25 +57,42 @@ class InvalidImageError(Exception):
     """The bytes are not an image that can be decoded, or the image is too big."""
 
 
-def resize(data: bytes, width: int) -> bytes:
-    """Return the image as JPEG (quality 80) that is `width` pixels wide.
-
-    A smaller image keeps its size: scaling up only makes the file bigger.
-    The image is converted to RGB first, because JPEG has no alpha and no palette.
+def decode(data: bytes) -> Image.Image:
+    """Decode an image and convert it to RGB, because JPEG has no alpha and no palette.
 
     Raises:
-        InvalidImageError: the data is not a readable image, or it is a decompression bomb.
+        InvalidImageError: the data is not a readable image, or it has too many pixels.
     """
     try:
         with Image.open(io.BytesIO(data)) as source:
-            image = source.convert("RGB")
-    except (OSError, Image.DecompressionBombError) as err:  # OSError: unknown format or truncated file
+            # The size is known from the header. Check it before the pixels are decoded.
+            if source.width * source.height > MAX_IMAGE_PIXELS:
+                raise InvalidImageError(f"Image of {source.width}x{source.height} pixels is too big")
+            return source.convert("RGB")
+    except (OSError, ValueError, Image.DecompressionBombError) as err:  # OSError: unknown format or truncated file
         raise InvalidImageError(str(err)) from err
+
+
+def scale(image: Image.Image, width: int) -> bytes:
+    """Return the image as JPEG (quality 80) that is `width` pixels wide.
+
+    A smaller image keeps its size: scaling up only makes the file bigger.
+    """
     if image.width > width:
-        image = image.resize((width, round(image.height * width / image.width)), Image.Resampling.LANCZOS)
+        height = max(1, round(image.height * width / image.width))  # a very wide strip must not get height 0
+        image = image.resize((width, height), Image.Resampling.LANCZOS)
     output = io.BytesIO()
     image.save(output, "JPEG", quality=JPEG_QUALITY)
     return output.getvalue()
+
+
+def resize(data: bytes, width: int) -> bytes:
+    """Decode `data` and return it as a JPEG `width` pixels wide.
+
+    Raises:
+        InvalidImageError: see `decode`.
+    """
+    return scale(decode(data), width)
 
 
 def is_image_size(value: str) -> TypeGuard[ImageSize]:
@@ -88,36 +109,61 @@ class ImageCache:
         self._folder = folder
         self._locks: dict[str, asyncio.Lock] = {}
         self._lock_users: Counter[str] = Counter()
+        self._downloads = asyncio.Semaphore(MAX_PARALLEL_DOWNLOADS)
+        self._failed: dict[str, float] = {}  # image id -> monotonic time of the failure
+        # Building the map hashes every poster URL. The coordinator replaces the `Guide` on a refresh and
+        # never changes the old one, so the map is valid while the object is the same.
+        self._guide_maps: dict[str, tuple[Guide, dict[str, str]]] = {}
 
     async def async_get(self, image_id: str, size: ImageSize) -> Path | None:
         """Return the file of a poster, downloading it on the first request.
 
         Returns None when the id is not in a loaded guide, the source fails and there
         is no copy, or the image is broken. A hit also sets the file time to now, so
-        `async_cleanup` keeps files in use.
+        `async_cleanup` keeps files in use. A poster that failed is not tried again for a few minutes.
         """
-        url = self._guide_urls().get(image_id)
+        url = self._source_url(image_id)
         if url is None or urlsplit(url).scheme not in ("http", "https"):
             return None
         path = self._path(image_id, size)
         if await self._hass.async_add_executor_job(_touch, path):
             return path
+        if self._recently_failed(image_id):
+            return None
         async with self._download_lock(image_id):
-            # Another request may have made the files while this one waited.
+            # Another request may have made the files, or failed, while this one waited.
             if await self._hass.async_add_executor_job(_touch, path):
                 return path
-            return await self._download(image_id, url, path)
+            if self._recently_failed(image_id):
+                return None
+            async with self._downloads:
+                result = await self._download(image_id, url, path)
+            if result is None:
+                self._remember_failure(image_id)
+            return result
 
     async def async_cleanup(self, max_age: timedelta) -> int:
         """Delete files not used for `max_age`. Return how many were deleted."""
         return await self._hass.async_add_executor_job(_delete_older_than, self._folder, max_age)
 
-    def _guide_urls(self) -> dict[str, str]:
-        """Source URL of every poster in every loaded guide, by image id."""
-        urls: dict[str, str] = {}
+    def _source_url(self, image_id: str) -> str | None:
+        """Source URL of a poster in any loaded guide, or None."""
+        maps: dict[str, tuple[Guide, dict[str, str]]] = {}
         for entry in self._hass.config_entries.async_loaded_entries(DOMAIN):
-            urls.update(entry.runtime_data.data.image_urls())
-        return urls
+            guide = entry.runtime_data.data
+            known = self._guide_maps.get(entry.entry_id)
+            maps[entry.entry_id] = known if known and known[0] is guide else (guide, guide.image_urls())
+        self._guide_maps = maps  # also drops the maps of entries that are no longer loaded
+        return next((urls[image_id] for _, urls in maps.values() if image_id in urls), None)
+
+    def _recently_failed(self, image_id: str) -> bool:
+        failed_at = self._failed.get(image_id)
+        return failed_at is not None and time.monotonic() - failed_at < FAILURE_MEMORY
+
+    def _remember_failure(self, image_id: str) -> None:
+        now = time.monotonic()
+        self._failed = {k: t for k, t in self._failed.items() if now - t < FAILURE_MEMORY}
+        self._failed[image_id] = now
 
     def _path(self, image_id: str, size: ImageSize) -> Path:
         return self._folder / f"{image_id}_{size}.jpg"
@@ -164,7 +210,8 @@ def _touch(path: Path) -> bool:
 
 def _store_sizes(folder: Path, image_id: str, data: bytes) -> None:
     """Make both sizes, then write them. Nothing is written when the image is broken."""
-    files = {f"{image_id}_{size}.jpg": resize(data, width) for size, width in SIZE_WIDTHS.items()}
+    image = decode(data)
+    files = {f"{image_id}_{size}.jpg": scale(image, width) for size, width in SIZE_WIDTHS.items()}
     folder.mkdir(parents=True, exist_ok=True)
     for name, content in files.items():
         _write_atomic(folder / name, content)

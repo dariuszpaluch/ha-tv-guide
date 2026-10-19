@@ -1,6 +1,7 @@
 """Tests for the poster cache and the image view."""
 
 import asyncio
+import dataclasses
 import io
 import os
 import time
@@ -11,7 +12,16 @@ import aiohttp
 import pytest
 from PIL import Image
 
-from custom_components.tv_guide.images import IMAGE_CACHE, IMAGE_FOLDER, ImageCache, resize
+from custom_components.tv_guide.images import (
+    FAILURE_MEMORY,
+    IMAGE_CACHE,
+    IMAGE_FOLDER,
+    MAX_PARALLEL_DOWNLOADS,
+    ImageCache,
+    _store_sizes,
+    decode,
+    resize,
+)
 from custom_components.tv_guide.model import Guide, image_id
 
 POSTER_URL = "https://img.example/fakty.jpg"
@@ -234,3 +244,116 @@ async def test_cleanup_removes_old_files(hass, tmp_path):
 
 async def test_cleanup_without_folder(hass, tmp_path):
     assert await ImageCache(hass, tmp_path / "missing").async_cleanup(timedelta(days=7)) == 0
+
+
+async def test_guide_map_built_once_per_guide(
+    hass, hass_client_no_auth, aioclient_mock, loaded_entry, monkeypatch, poster_bytes
+):
+    calls: list[Guide] = []
+    original = Guide.image_urls
+
+    def counting(self: Guide) -> dict[str, str]:
+        calls.append(self)
+        return original(self)
+
+    monkeypatch.setattr(Guide, "image_urls", counting)
+    aioclient_mock.get(POSTER_URL, content=poster_bytes)
+    client = await hass_client_no_auth()
+
+    for path in (THUMB_PATH, THUMB_PATH, LARGE_PATH):
+        assert (await client.get(path)).status == 200
+    assert len(calls) == 1
+
+    # A refresh swaps in a new Guide object: the map is built again, once.
+    coordinator = loaded_entry.runtime_data
+    coordinator.async_set_updated_data(dataclasses.replace(coordinator.data))
+    assert (await client.get(THUMB_PATH)).status == 200
+    assert (await client.get(THUMB_PATH)).status == 200
+    assert len(calls) == 2
+
+
+async def test_failed_poster_not_tried_again(hass_client_no_auth, aioclient_mock, loaded_entry, freezer):
+    aioclient_mock.get(POSTER_URL, content=b"not an image")
+    client = await hass_client_no_auth()
+    assert (await client.get(THUMB_PATH)).status == 404
+    after_first = aioclient_mock.call_count
+
+    assert (await client.get(THUMB_PATH)).status == 404
+    assert (await client.get(LARGE_PATH)).status == 404
+    assert aioclient_mock.call_count == after_first
+
+    # After the memory time the poster is tried again.
+    freezer.tick(FAILURE_MEMORY + 1)
+    assert (await client.get(THUMB_PATH)).status == 404
+    assert aioclient_mock.call_count == after_first + 1
+
+
+async def test_concurrent_requests_for_failing_poster_download_once(hass_client_no_auth, aioclient_mock, loaded_entry):
+    aioclient_mock.get(POSTER_URL, status=503)
+    client = await hass_client_no_auth()
+    before = aioclient_mock.call_count
+
+    responses = await asyncio.gather(*(client.get(THUMB_PATH) for _ in range(5)))
+
+    assert [r.status for r in responses] == [404] * 5
+    assert aioclient_mock.call_count - before == 1
+
+
+async def test_downloads_run_at_most_four_at_once(hass, loaded_entry, monkeypatch):
+    cache = hass.data[IMAGE_CACHE]
+    running = peak = 0
+
+    async def slow_download(image_id, url, wanted):
+        nonlocal running, peak
+        running += 1
+        peak = max(peak, running)
+        await asyncio.sleep(0.01)
+        running -= 1
+
+    monkeypatch.setattr(cache, "_download", slow_download)
+    urls = {f"{i:032x}": f"https://img.example/{i}.jpg" for i in range(10)}
+    monkeypatch.setattr(Guide, "image_urls", lambda _self: urls)
+
+    await asyncio.gather(*(cache.async_get(image_id, "thumb") for image_id in urls))
+
+    assert peak == MAX_PARALLEL_DOWNLOADS
+
+
+async def test_very_wide_image_gets_height_of_one_pixel(hass_client_no_auth, aioclient_mock, loaded_entry):
+    aioclient_mock.get(POSTER_URL, content=jpeg(5000, 5))
+    client = await hass_client_no_auth()
+
+    response = await client.get(THUMB_PATH)
+
+    assert response.status == 200
+    assert Image.open(io.BytesIO(await response.read())).size == (336, 1)
+
+
+def test_resize_wide_strip():
+    assert Image.open(io.BytesIO(resize(jpeg(5000, 5), 336))).size == (336, 1)
+
+
+async def test_image_over_pixel_limit_404(hass, hass_client_no_auth, aioclient_mock, loaded_entry, monkeypatch):
+    monkeypatch.setattr("custom_components.tv_guide.images.MAX_IMAGE_PIXELS", 10_000)
+    aioclient_mock.get(POSTER_URL, content=jpeg(200, 100))  # 20 000 pixels
+    client = await hass_client_no_auth()
+
+    assert (await client.get(THUMB_PATH)).status == 404
+    assert stored_files(hass) == []
+
+
+def test_store_decodes_once(tmp_path, poster_bytes, monkeypatch):
+    calls = 0
+    original = decode
+
+    def counting(data: bytes):
+        nonlocal calls
+        calls += 1
+        return original(data)
+
+    monkeypatch.setattr("custom_components.tv_guide.images.decode", counting)
+
+    _store_sizes(tmp_path, "a" * 32, poster_bytes)
+
+    assert calls == 1
+    assert len(list(tmp_path.glob("*.jpg"))) == 2
