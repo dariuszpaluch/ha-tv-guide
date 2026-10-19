@@ -107,6 +107,7 @@ Output: `Programme[]`.
 - Match: normalized title equal to the normalized title of the programme (equal, not a substring: "Fakty" does not match "Fakty po południu").
 - Only programmes with `start > now`, without the programme itself, on the programme's channel or on a channel in `channel_ids`.
 - Order: first the programme's channel, soonest first; then the other channels, soonest first.
+- A programme shorter than 15 minutes has no airings: empty list. Short programmes (weather, news flashes) have generic titles like "Pogoda" that match unrelated programmes on other channels.
 - Unknown `programme_id` (for example, the guide was refreshed): empty list.
 
 ## HTTP
