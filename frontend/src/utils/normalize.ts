@@ -13,7 +13,7 @@ const FOLD_PATTERN = new RegExp(`[${Object.keys(FOLD).join('')}]`, 'gu');
 export const normalize = (text: string): string =>
   text
     .normalize('NFKD')
-    .replace(/\p{M}/gu, '')
+    .replace(/\p{Mn}/gu, '')
     .toLowerCase()
     .replace(FOLD_PATTERN, (letter) => FOLD[letter] ?? letter)
     .trim();

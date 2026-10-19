@@ -20,7 +20,7 @@ _FOLD = str.maketrans({"ł": "l", "ß": "ss", "ı": "i", "ø": "o", "đ": "d", "
 def normalize(text: str) -> str:
     """Text for matching: lower case, no diacritics, a few letters folded, no outer whitespace."""
     decomposed = unicodedata.normalize("NFKD", text.lower())
-    without_marks = "".join(c for c in decomposed if not unicodedata.combining(c))
+    without_marks = "".join(c for c in decomposed if unicodedata.category(c) != "Mn")
     return without_marks.translate(_FOLD).strip()
 
 

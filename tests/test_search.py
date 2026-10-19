@@ -22,6 +22,10 @@ NORMALIZE_CASES = [
     ("Đoković", "dokovic"),
     ("Æble", "aeble"),
     ("Œuvre", "oeuvre"),
+    # Only non-spacing marks (Mn) go. The Devanagari vowel sign in "की" is a spacing mark (Mc), so it stays.
+    ("की", "की"),
+    ("กำ", "กา"),
+    ("ที่", "ท"),
 ]
 
 
