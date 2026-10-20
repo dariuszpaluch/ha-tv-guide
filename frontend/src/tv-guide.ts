@@ -51,7 +51,6 @@ interface Details {
   loading: boolean;
   /** Set when the schedule request failed. The channel view then shows the error, not "no guide". */
   error?: LoadError;
-  showEarlier: boolean;
   programme?: Programme;
   showProgramme: boolean;
   /** `null` while they load. */
@@ -434,7 +433,7 @@ export class TvGuide extends LitElement {
   /** A tap on a day chip. All days are loaded already, so this makes no request. */
   private readonly onDay = (event: HTMLElementEventMap['tvg-day']): void => {
     if (!this.details) return;
-    this.details = { ...this.details, day: event.detail.key, showEarlier: false };
+    this.details = { ...this.details, day: event.detail.key };
     // A failed schedule is tried again on the next tap.
     if (this.details.error) void this.loadSchedule();
   };
@@ -447,11 +446,6 @@ export class TvGuide extends LitElement {
   /** The sheet was closed. It keeps its content while it slides away. */
   private readonly onClose = (): void => {
     if (this.details) this.details = { ...this.details, open: false };
-  };
-
-  /** A tap on "Show N earlier". */
-  private readonly onShowEarlier = (): void => {
-    if (this.details) this.details = { ...this.details, showEarlier: true };
   };
 
   /**
@@ -467,7 +461,6 @@ export class TvGuide extends LitElement {
       days: [...new Set([this.todayKey(), day])].sort(),
       programmes: [],
       loading: channel.epg_id !== undefined,
-      showEarlier: false,
       programme,
       showProgramme: programme !== undefined,
       airings: null,
@@ -547,13 +540,12 @@ export class TvGuide extends LitElement {
       @tvg-day=${this.onDay}
       @tvg-back=${this.onBack}
       @tvg-close=${this.onClose}
-      @tvg-show-earlier=${this.onShowEarlier}
       @tvg-reminder=${this.onReminder}
     >
       <tvg-search-box class="panel" .value=${this.query} .t=${t}></tvg-search-box>
       ${stale ? html`<div class="stale">${t('staleGuide', { date_time: this.lastSuccessText() })}</div>` : nothing}
       <div class="panel list">${this.renderList(t)}</div>
-      ${this.renderToast(t)} ${this.renderDetails(t)}
+      ${this.details?.open ? nothing : this.renderToast(t)} ${this.renderDetails(t)}
     </div>`;
   }
 
@@ -565,11 +557,17 @@ export class TvGuide extends LitElement {
     return formatLastSuccess(info, locale, this.timeZone(), hour12(hassObject.locale.time_format));
   }
 
-  /** A short note about the channel switch in progress. */
-  private renderToast(t: Translate): TemplateResult | typeof nothing {
+  /**
+   * A short note about the channel switch in progress.
+   * The open sheet covers the card, so the note then goes into the sheet's `toast` slot.
+   */
+  private renderToast(t: Translate, slot?: 'toast'): TemplateResult | typeof nothing {
     const channel = this.switchingNumber === undefined ? undefined : this.channelByNumber(this.switchingNumber);
     return channel
-      ? html`<div class="toast" role="status">${t('switching', { channel_number: channel.number, channel_name: channel.name })}</div>`
+      ? html`<div class="toast" role="status" slot=${slot ?? nothing}>${t('switching', {
+          channel_number: channel.number,
+          channel_name: channel.name,
+        })}</div>`
       : nothing;
   }
 
@@ -683,7 +681,7 @@ export class TvGuide extends LitElement {
         .days=${details.days}
         .selectedDay=${details.day}
         .todayKey=${this.todayKey()}
-        .showEarlier=${details.showEarlier}
+        .focusId=${programme?.id ?? ''}
         .now=${this.nowMs}
         .t=${t}
         .locale=${locale}
@@ -719,6 +717,7 @@ export class TvGuide extends LitElement {
             .noPhone=${this.reminders?.phones.length === 0}
           ></tvg-programme-view>`
         : nothing}
+      ${details.open ? this.renderToast(t, 'toast') : nothing}
     </tvg-sheet>`;
   }
 }

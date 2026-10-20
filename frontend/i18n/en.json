@@ -22,7 +22,6 @@
   "minutes": "{minutes} min",
   "today": "Today",
   "tomorrow": "Tomorrow",
-  "earlier": "Show {count} earlier",
   "switchTo": "Switch to {channel_number}",
   "switching": "Switching to {channel_number} {channel_name}",
   "moreAirings": "More airings",

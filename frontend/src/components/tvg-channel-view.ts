@@ -1,4 +1,4 @@
-import { LitElement, css, html, nothing } from 'lit';
+import { LitElement, css, html, nothing, type PropertyValues } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import type { ChannelConfig } from '../config';
 import { dayLabel, formatTime, progress } from '../data/time';
@@ -20,8 +20,22 @@ import {
 } from './view-parts';
 
 /**
+ * Index of the programme the schedule scrolls to: the focused one, else on today the first one that has not ended.
+ * `-1` means the top of the list.
+ * @param programmes Programmes of the shown day, in order.
+ * @param focusId Id of the programme to keep in view, or `''`.
+ * @param now Current time, in milliseconds.
+ * @param today Whether the shown day is today.
+ */
+export const scrollAnchor = (programmes: Programme[], focusId: string, now: number, today: boolean): number => {
+  const focused = focusId ? programmes.findIndex((p) => p.id === focusId) : -1;
+  if (focused >= 0 || !today) return focused;
+  return programmes.findIndex((p) => Date.parse(p.stop) > now);
+};
+
+/**
  * The base view of the details sheet: one channel, day chips and the schedule of the chosen day.
- * On today's TV day the ended programmes are folded behind "Show N earlier".
+ * The schedule scrolls to the focused programme, or on today to the programme on now, with one programme above it.
  * It has one `header` (the sheet starts a close drag from it) and no other.
  */
 @customElement('tvg-channel-view')
@@ -36,8 +50,8 @@ export class TvgChannelView extends LitElement {
   @property({ attribute: false }) selectedDay = '';
   /** Key of the current TV day, `YYYY-MM-DD`. */
   @property({ attribute: false }) todayKey = '';
-  /** Whether the ended programmes of today show. */
-  @property({ attribute: false }) showEarlier = false;
+  /** Id of the programme to keep in view: the one the programme view shows. Empty for none. */
+  @property({ attribute: false }) focusId = '';
   /** Current time, in milliseconds. */
   @property({ attribute: false }) now = 0;
   @property({ attribute: false }) t!: Translate;
@@ -55,6 +69,8 @@ export class TvgChannelView extends LitElement {
   @property({ attribute: false }) remindedIds: ReadonlySet<string> = new Set();
 
   private readonly broken = new BrokenPosters(this);
+  /** A scroll waits for the next frame. `true` while it may keep a visible row where it is. */
+  private scrollPending?: boolean;
 
   static styles = [
     viewStyles,
@@ -172,6 +188,45 @@ export class TvgChannelView extends LitElement {
     return this.programmes.filter((p) => overlapsDay(p, this.selectedDay, this.timeZone, this.startHour));
   }
 
+  protected updated(changed: PropertyValues<this>): void {
+    const moved = (['channel', 'programmes', 'selectedDay', 'loading'] as const).some((key) => changed.has(key));
+    if (!moved && !changed.has('focusId')) return;
+    const queued = this.scrollPending !== undefined;
+    this.scrollPending = (this.scrollPending ?? true) && !moved;
+    if (queued) return;
+    // The day chips and the progress bar render after this view, so the rows get their size in the next frame.
+    requestAnimationFrame(() => {
+      const onlyIfHidden = this.scrollPending;
+      this.scrollPending = undefined;
+      if (onlyIfHidden !== undefined) this.scrollToAnchor(onlyIfHidden);
+    });
+  }
+
+  /**
+   * Scrolls the schedule so the anchor programme is the second row, under the one before it.
+   * With `onlyIfHidden` a row that the user can see stays where it is, so a tap on a row does not move the list.
+   * It sets `scrollTop` and does not use `scrollIntoView()`, which also scrolls the HA page.
+   */
+  private scrollToAnchor(onlyIfHidden: boolean): void {
+    const scroll = this.renderRoot.querySelector<HTMLElement>('.scroll');
+    if (!scroll) return;
+    const slots = [...this.renderRoot.querySelectorAll<HTMLElement>('.slot')];
+    const index = scrollAnchor(this.dayProgrammes(), this.focusId, this.now, this.selectedDay === this.todayKey);
+    const anchor = slots[index];
+    if (!anchor) {
+      if (!onlyIfHidden) scroll.scrollTop = 0;
+      return;
+    }
+    // The day chips stick to the top of the list and cover the rows under them.
+    const covered = this.renderRoot.querySelector<HTMLElement>('tvg-day-chips')?.offsetHeight ?? 0;
+    const visible =
+      anchor.offsetTop >= scroll.scrollTop + covered &&
+      anchor.offsetTop + anchor.offsetHeight <= scroll.scrollTop + scroll.clientHeight;
+    if (onlyIfHidden && visible) return;
+    const top = slots[index - 1] ?? anchor;
+    scroll.scrollTop = Math.max(0, top.offsetTop - covered);
+  }
+
   private renderSlot(programme: Programme) {
     const start = Date.parse(programme.start);
     const stop = Date.parse(programme.stop);
@@ -203,10 +258,6 @@ export class TvgChannelView extends LitElement {
   }
 
   private renderSchedule() {
-    const all = this.dayProgrammes();
-    const foldable = this.selectedDay === this.todayKey && !this.showEarlier;
-    const ended = foldable ? all.filter((p) => Date.parse(p.stop) <= this.now) : [];
-    const shown = foldable ? all.filter((p) => !ended.includes(p)) : all;
     return html`
       <tvg-day-chips
         .days=${this.days}
@@ -214,12 +265,7 @@ export class TvgChannelView extends LitElement {
         .labels=${Object.fromEntries(this.days.map((key) => [key, dayLabel(key, this.todayKey, this.locale, this.t)]))}
         .groupLabel=${this.t('day')}
       ></tvg-day-chips>
-      <div class="sched">
-        ${ended.length
-          ? html`<button class="text-btn" @click=${() => fire(this, 'tvg-show-earlier', {})}>${this.t('earlier', { count: ended.length })}</button>`
-          : nothing}
-        ${shown.map((p) => this.renderSlot(p))}
-      </div>
+      <div class="sched">${this.dayProgrammes().map((p) => this.renderSlot(p))}</div>
     `;
   }
 
