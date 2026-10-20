@@ -51,5 +51,16 @@
     "abort": {
       "not_loaded": "Shows when the user opens the options before the integration has loaded a guide, so there is no channel list yet."
     }
+  },
+  "exceptions": {
+    "reminder_starting_title": {
+      "message": "Title of the phone notification for a programme that starts soon. {channel_name} is the TV channel name, {time} is the start time (24-hour, for example 20:00)."
+    },
+    "reminder_starting_message": {
+      "message": "Text of the phone notification that a programme starts in 5 minutes. {title} is the programme title."
+    },
+    "reminder_gone_message": {
+      "message": "Text of the phone notification when a programme with a reminder was removed from the guide. {title} is the programme title."
+    }
   }
 }
