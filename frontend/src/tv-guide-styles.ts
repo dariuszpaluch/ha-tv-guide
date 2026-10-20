@@ -13,10 +13,6 @@ export const tvGuideStyles = css`
     display: flex;
     flex-direction: column;
     gap: 8px;
-    padding: 12px;
-    overflow: hidden;
-    border-radius: 18px;
-    background: var(--primary-background-color);
     color: var(--primary-text-color);
     font-size: 14px;
   }
