@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.2.0 - 2026-10-20
+
+### Card
+
+- Set or remove a reminder with the bell in programme details. A bell under the time marks it in the channel schedule.
+- Shows a warning when no phone is found for your HA user.
+
+### Integration
+
+- Sends a notification to your Companion app phones 5 minutes before the programme starts.
+- Stores reminders per user and restores their timers after a restart.
+- Follows moved programmes and sends one notice when a programme leaves the guide.
+- Fires `tv_guide_reminder` for your automations, also when no phone is found.
+
 ## 0.1.1 - 2026-10-20
 
 ### Card

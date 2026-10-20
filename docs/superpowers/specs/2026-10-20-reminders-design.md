@@ -1,6 +1,6 @@
 # Reminders - design
 
-Date: 2026-10-20. Status: draft, not approved.
+Date: 2026-10-20. Status: approved, implemented.
 
 ## What problem does it solve?
 
@@ -120,7 +120,7 @@ Every reminder command answers with the full list, so the card needs one round t
 - `GuideClient`: `reminders()`, `addReminder(programmeId, language)`, `removeReminder(programmeId)`. No cache.
 - `tv-guide.ts`: a `reminders` state. `refresh()` loads it every 60 seconds, apart from the guide calls, so a reminders failure does not break the guide. After a reminder fires on the server, the bell turns off on the next refresh.
 - Programme view: a bell button in the header, before the close button. `aria-pressed` shows its state. No bell when the programme starts in 5 minutes or less. When the bell is on and `phones` is empty, a short warning shows under the times.
-- Channel view: a small bell next to the time of each programme with a reminder.
+- Channel view: a small bell under the time of each programme with a reminder.
 - New event `tvg-reminder` `{ programmeId, on }` from the bell to the root card. A failure shows a `hass-notification` toast, like a failed switch.
 - New strings in `frontend/i18n/` (`en`, `pl`, `qqq`): `remindMe`, `reminderSet`, `noPhone`, `reminderFailed`.
 - New icon: `bell` and `bellRing` (MDI `mdiBellOutline`, `mdiBellRing`).

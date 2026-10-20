@@ -20,6 +20,7 @@ A TV guide in your Home Assistant dashboard: what is on now, what comes next, th
 - Programme details: poster, description, category, age rating, year, and more airings of the same programme.
 - Search in channels, programmes on now and programmes later.
 - Switch the channel with one tap. Any Home Assistant action works.
+- Set a reminder. Your phone gets a notification 5 minutes before the programme starts.
 - Works with any [XMLTV](https://wiki.xmltv.org/index.php/XMLTVFormat) guide, plain or compressed.
 - Keeps the last good guide on disk, so the card works when the guide source is down.
 - Follows your Home Assistant theme, language (English or Polish), time format and time zone.
@@ -143,6 +144,44 @@ switch_action:
     media_content_id: "{number}"
 ```
 
+## Reminders
+
+Open a programme and tap the bell to set a reminder. Tap it again to remove the reminder. The bell is available only when the programme starts in more than 5 minutes. A small bell under the time marks your reminder in the channel schedule.
+
+The phones of your HA user with the Home Assistant Companion app get a notification 5 minutes before the start. The integration finds the phones with a notify service. There is nothing to set in the card. Each user has their own reminders. The notification is in Polish or English, from the HA profile language when you set the reminder.
+
+Reminders survive a Home Assistant restart. If HA starts after the reminder was due but before the programme starts, it sends the notification at once. If the programme has started, it deletes the reminder without a notice.
+
+When the guide changes, the reminder follows a programme with the same title on the same channel within 3 hours of its old start. If the programme is gone, you get one notice and the reminder is deleted. If the channel has no guide data around that time, the reminder keeps its stored start.
+
+If the integration finds no phone for your user, the card shows a warning. The reminder still fires the `tv_guide_reminder` event. You can use this event in an automation, with or without a phone.
+
+The event has these fields:
+
+- `kind`: `starting` when the reminder is due, or `gone` when the programme leaves the guide.
+- `user_id`: the HA user who set the reminder.
+- `programme_id`, `channel_id`, `channel_name`, `title`, `start`: the programme details. `start` is an ISO 8601 time with an offset.
+
+For example, paste this into the YAML editor of a new automation to create a persistent notification in HA for either event kind. It handles reminders from all users. Add `user_id` under the trigger's `event_data` to limit it to one user.
+
+```yaml
+alias: TV guide reminder
+triggers:
+  - trigger: event
+    event_type: tv_guide_reminder
+actions:
+  - action: persistent_notification.create
+    data:
+      title: "{{ trigger.event.data.channel_name }}"
+      message: >-
+        {% if trigger.event.data.kind == 'starting' %}
+          {{ trigger.event.data.title }} starts at {{ trigger.event.data.start }}.
+        {% else %}
+          {{ trigger.event.data.title }} is no longer in the guide.
+        {% endif %}
+mode: queued
+```
+
 ## Find a guide
 
 The integration works with any XMLTV guide. Nothing in it is tied to one country.
@@ -210,7 +249,7 @@ Open Settings → Devices & services → TV guide, then select ⋮ → **Downloa
 ## Remove
 
 1. Remove the TV guide card from your dashboards.
-2. Open Settings → Devices & services → TV guide, then select ⋮ → **Delete**. This deletes the stored guide. When you delete the last guide, the cached posters are deleted too.
+2. Open Settings → Devices & services → TV guide, then select ⋮ → **Delete**. This deletes the stored guide and its reminders. When you delete the last guide, the cached posters are deleted too.
 3. In HACS, open TV guide and select **Remove**. If you installed by hand, delete `<config>/custom_components/tv_guide/`.
 4. Restart Home Assistant.
 
