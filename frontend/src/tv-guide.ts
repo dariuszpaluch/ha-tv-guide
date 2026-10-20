@@ -24,7 +24,7 @@ import { SearchRunner, firstResult, type SearchResults } from './data/search';
 import { formatLastSuccess, isStale } from './data/stale';
 import { overlapsDay } from './components/view-parts';
 import { hour12, timeZoneOf, tvDayKey, tvDayRange, tvDays } from './data/time';
-import { en, localeOf, resolveLanguage, translator, type Translate } from './i18n';
+import { localeOf, resolveLanguage, translator, type Translate } from './i18n';
 import type { GuideErrorCode, GuideInfo, NowMap, Programme } from './types/api';
 import type { HomeAssistant } from './types/hass';
 import { tvGuideStyles } from './tv-guide-styles';
@@ -304,7 +304,7 @@ export class TvGuide extends LitElement {
       (error: unknown) => {
         this.dispatchEvent(
           new CustomEvent('hass-notification', {
-            detail: { message: t('switchFailed', channel.name, errorText(error)) },
+            detail: { message: t('switchFailed', { channel_name: channel.name, error: errorText(error) }) },
             bubbles: true,
             composed: true,
           }),
@@ -505,7 +505,7 @@ export class TvGuide extends LitElement {
       @tvg-show-earlier=${this.onShowEarlier}
     >
       <tvg-search-box class="panel" .value=${this.query} .t=${t}></tvg-search-box>
-      ${stale ? html`<div class="stale">${t('staleGuide', this.lastSuccessText())}</div>` : nothing}
+      ${stale ? html`<div class="stale">${t('staleGuide', { date_time: this.lastSuccessText() })}</div>` : nothing}
       <div class="panel list">${this.renderList(t)}</div>
       ${this.renderToast(t)} ${this.renderDetails(t)}
     </div>`;
@@ -523,7 +523,7 @@ export class TvGuide extends LitElement {
   private renderToast(t: Translate): TemplateResult | typeof nothing {
     const channel = this.switchingNumber === undefined ? undefined : this.channelByNumber(this.switchingNumber);
     return channel
-      ? html`<div class="toast" role="status">${t('switching', channel.number, channel.name)}</div>`
+      ? html`<div class="toast" role="status">${t('switching', { channel_number: channel.number, channel_name: channel.name })}</div>`
       : nothing;
   }
 
@@ -590,7 +590,7 @@ export class TvGuide extends LitElement {
     const { query, channels, now, later, error } = results;
     const failed = error ? html`<div class="empty">${t(loadErrorKey(error))}</div>` : undefined;
     if (now && later && !channels.length && !now.length && !later.length) {
-      return failed ?? html`<div class="empty">${t('noMatch', this.query.trim())}</div>`;
+      return failed ?? html`<div class="empty">${t('noMatch', { query: this.query.trim() })}</div>`;
     }
     const target = this.config ? firstResult(results, this.config) : undefined;
     let firstUsed = false;
@@ -678,7 +678,7 @@ export class TvGuide extends LitElement {
 export const registerCard = (): void => {
   window.customCards ??= [];
   if (window.customCards.some((card) => card.type === CARD_TYPE)) return;
-  window.customCards.push({ type: CARD_TYPE, name: 'TV guide', description: en.cardDescription });
+  window.customCards.push({ type: CARD_TYPE, name: 'TV guide', description: translator('en')('cardDescription') });
 };
 
 registerCard();

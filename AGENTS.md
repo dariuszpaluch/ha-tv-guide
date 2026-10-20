@@ -41,7 +41,7 @@ Read before you change anything:
 You do not need a running Home Assistant.
 
 - The integration tests use the `hass` fixture of `pytest-homeassistant-custom-component`. The shared test data is in `tests/conftest.py` and `tests/fixtures/`.
-- The card tests use Vitest with happy-dom. The shared guide data is in `frontend/src/test/fixtures.ts`. `frontend/src/tv-guide.test.ts` builds a fake `hass` object with a fake server (`makeHass`).
+- The card tests use Vitest with happy-dom. The tests are in `frontend/tests/`, in the same folders as the code in `frontend/src/`. The shared guide data is in `frontend/tests/fixtures.ts`. `frontend/tests/tv-guide.test.ts` builds a fake `hass` object with a fake server (`makeHass`).
 - The test clock is 2026-10-19 19:20 in `Europe/Warsaw`.
 
 ## Where to start
@@ -53,10 +53,10 @@ You do not need a running Home Assistant.
 | Search, schedule, airings | `search.py` (server), `frontend/src/data/search.ts` (card steps) |
 | A WebSocket command | `docs/api.md` first, then `websocket_api.py` and `frontend/src/types/api.ts` |
 | Posters | `images.py` |
-| Setup screens | `config_flow.py`, `strings.json`, `translations/` |
+| Setup screens | `config_flow.py`, `translations/` (`en.json`, `pl.json`, `qqq.json`) |
 | Card config | `frontend/src/config.ts`, `README.md`, `examples/card.yaml` |
 | Card look | `frontend/src/components/`, `frontend/src/tv-guide-styles.ts` |
-| A visible string | `frontend/src/i18n/en.ts` and `pl.ts` |
+| A visible text in the card | `frontend/i18n/` (`en.json`, `pl.json`, `qqq.json`), read by `frontend/src/i18n.ts` |
 
 ## Extra rules for agents
 

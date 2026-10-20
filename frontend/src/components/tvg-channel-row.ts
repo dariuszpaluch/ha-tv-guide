@@ -53,7 +53,7 @@ export class TvgChannelRow extends LitElement {
       ${renderZap(this, { channel, logo: this.logo, switching: this.switching, darkMode: this.darkMode, t })}
       <button
         class="info"
-        aria-label=${t('details', channel.name)}
+        aria-label=${t('details', { name: channel.name })}
         @click=${() => fire(this, 'tvg-open-channel', { number: channel.number })}
       >
         <span class="col">

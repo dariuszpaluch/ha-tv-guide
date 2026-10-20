@@ -121,7 +121,7 @@ export const tvDays = (programmes: Programme[], todayKey: string, timeZone: stri
  * Label of a TV day: "Today", "Tomorrow", or a short weekday with the day number, like "Wed 21".
  * @param key Day key, `YYYY-MM-DD`.
  * @param todayKey Key of the current TV day.
- * @param locale `en-GB` or `pl-PL`.
+ * @param locale A locale from `localeOf`, such as `en-GB` or `pl`.
  * @param t Translate function.
  */
 export const dayLabel = (key: string, todayKey: string, locale: string, t: Translate): string => {
@@ -135,7 +135,7 @@ export const dayLabel = (key: string, todayKey: string, locale: string, t: Trans
 
 /**
  * Whether times use the 12-hour clock, from the HA profile setting.
- * `language` is the HA default; the card locales `en-GB` and `pl-PL` use the 24-hour clock.
+ * `language` is the HA default. It gives the 24-hour clock, like `en-GB` and Polish use.
  * @param timeFormat Value of `hass.locale.time_format`.
  */
 export const hour12 = (timeFormat: TimeFormat): boolean => {
@@ -154,7 +154,7 @@ export const timeZoneOf = (hass: HomeAssistant): string =>
 /**
  * Clock time of an instant.
  * @param ms Instant in milliseconds since the epoch.
- * @param locale `en-GB` or `pl-PL`.
+ * @param locale A locale from `localeOf`, such as `en-GB` or `pl`.
  * @param timeZone IANA time zone name.
  * @param use12Hour `true` for the 12-hour clock.
  */
@@ -172,14 +172,14 @@ export const formatTime = (ms: number, locale: string, timeZone: string, use12Ho
  * @param t Translate function.
  */
 export const formatDuration = (minutes: number, t: Translate): string =>
-  minutes >= 60 ? t('hours', Math.floor(minutes / 60), minutes % 60) : t('minutes', minutes);
+  minutes >= 60 ? t('hours', { hours: Math.floor(minutes / 60), minutes: minutes % 60 }) : t('minutes', { minutes });
 
 /**
  * Short text about when a programme happens: time left, time until it starts, or its day and time.
  * @param p The programme.
  * @param now Current instant in milliseconds.
  * @param todayKey Key of the current TV day.
- * @param locale `en-GB` or `pl-PL`.
+ * @param locale A locale from `localeOf`, such as `en-GB` or `pl`.
  * @param timeZone IANA time zone name.
  * @param use12Hour `true` for the 12-hour clock.
  * @param startHour Local hour at which a TV day starts.
@@ -197,10 +197,10 @@ export const whenText = (
 ): string => {
   const start = Date.parse(p.start);
   const stop = Date.parse(p.stop);
-  if (start <= now && stop > now) return t('left', formatDuration(Math.max(1, Math.round((stop - now) / MINUTE_MS)), t));
+  if (start <= now && stop > now) return t('left', { duration: formatDuration(Math.max(1, Math.round((stop - now) / MINUTE_MS)), t) });
   if (stop <= now) return t('ended');
   const key = tvDayKey(start, timeZone, startHour);
-  if (key === todayKey) return t('in', formatDuration(Math.max(1, Math.round((start - now) / MINUTE_MS)), t));
+  if (key === todayKey) return t('in', { duration: formatDuration(Math.max(1, Math.round((start - now) / MINUTE_MS)), t) });
   return `${dayLabel(key, todayKey, locale, t)}, ${formatTime(start, locale, timeZone, use12Hour)}`;
 };
 

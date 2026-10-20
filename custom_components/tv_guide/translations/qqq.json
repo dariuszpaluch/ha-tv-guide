@@ -1,0 +1,55 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Title of the first setup screen, where the user enters the address of the guide.",
+        "description": "Text at the top of the first setup screen. XMLTV is the name of a file format: do not translate it. gzip, xz and zip are names of compressed file formats.",
+        "data": {
+          "url": "Label of the field for the address of the XMLTV file."
+        },
+        "data_description": {
+          "url": "Help under the address field. .gz, .xz and .zip are file name endings: do not translate them."
+        }
+      },
+      "channels": {
+        "title": "Title of the second setup screen, where the user selects channels from the downloaded guide.",
+        "description": "Text at the top of the channel screen.",
+        "data": {
+          "channels": "Label of the list of channels to select."
+        },
+        "data_description": {
+          "channels": "Help under the channel list. It tells why the selection matters."
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Error at the top of the address screen when the file cannot be downloaded.",
+      "invalid_guide": "Error at the top of the address screen when the file is downloaded, but it is not an XMLTV guide.",
+      "no_channels": "Error under the channel list when the user selects no channel."
+    },
+    "abort": {
+      "already_configured": "Shows when the user adds a guide with an address that is already set up."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Title of the options screen of an integration that is already set up.",
+        "data": {
+          "channels": "Label of the list of channels to select.",
+          "update_interval": "Label of the number field for the hours between two downloads of the guide."
+        },
+        "data_description": {
+          "channels": "Help under the channel list on the options screen.",
+          "update_interval": "Help under the hours field. 1 and 48 are the lowest and the highest value the field accepts."
+        }
+      }
+    },
+    "error": {
+      "no_channels": "Error under the channel list on the options screen when the user selects no channel."
+    },
+    "abort": {
+      "not_loaded": "Shows when the user opens the options before the integration has loaded a guide, so there is no channel list yet."
+    }
+  }
+}

@@ -33,10 +33,10 @@ Without a built card, the integration still starts. It logs a warning that the c
 ## Rules
 
 - **Contract first.** [docs/api.md](docs/api.md) is the only source for the WebSocket and HTTP API. To change the API, change `docs/api.md` first, in its own commit. Then change the integration, `frontend/src/types/api.ts` and the card.
-- **Tests with every change.** Write a failing test first, then the code. Run all tests of the part you changed before each commit.
+- **Tests with every change.** Write a failing test first, then the code. Run all tests of the part you changed before each commit. The integration tests are in `tests/`. The card tests are in `frontend/tests/`, in the same folders as the code in `frontend/src/`, so `src/` holds only the card code.
 - **Python.** Type hints everywhere and docstrings on public functions. Use `async` for I/O. Blocking work (decompressing, parsing, Pillow, file I/O) runs in `hass.async_add_executor_job`. Do not add packages to `manifest.json` `requirements`: use what HA core already ships. HA 2026.10 builds its schemas with `probatio`, so the integration does too. `voluptuous` is still installed for other packages, but do not import it.
 - **TypeScript.** `strict: true`, no `any`. Derive types from the contract types in `frontend/src/types/api.ts`. Semicolons, `const`, arrow functions, early returns, JSDoc on all functions.
-- **Card look.** Use only HA theme variables (`--primary-color`, `--card-background-color`, ...). No fixed colours, except the logo tiles. Every user-visible string goes through `t()` and exists in `en.ts` and `pl.ts`.
+- **Card look.** Use only HA theme variables (`--primary-color`, `--card-background-color`, ...). No fixed colours, except the logo tiles. Every user-visible text goes through `t()`. See [Texts and translations](#texts-and-translations).
 - **Comments and docs.** Plain English, short sentences, active voice. Explain why, not what.
 - **Commits.** [Conventional commits](https://www.conventionalcommits.org): `feat:`, `fix:`, `test:`, `refactor:`, `docs:`, `chore:`, `ci:`. Do not squash or rewrite published history.
 
@@ -53,17 +53,33 @@ These cases broke before or are easy to break. Keep a test for each one.
 
 Before a release, also try the card by hand: on a phone (the HA app) and in a desktop browser, light and dark theme, Polish and English.
 
-## Add a language
+## Texts and translations
 
-The card:
+The card and the integration keep their texts in JSON files, one file per language:
 
-1. Copy `frontend/src/i18n/en.ts` to a new file, for example `de.ts`, and translate the strings. Type it as `Strings`, like `pl.ts`.
-2. In `frontend/src/i18n/index.ts`, add the language to `Language`, its locale to `LOCALES`, and pick it in `resolveLanguage` and `translator`.
-3. Add the new language next to the Polish cases in `frontend/src/i18n/index.test.ts`.
+| Part | Folder | Format |
+| --- | --- | --- |
+| Card | `frontend/i18n/` | Flat keys: `"switchTo": "Switch to {channel_number}"` |
+| Integration setup screens | `custom_components/tv_guide/translations/` | The nested format of Home Assistant |
 
-The integration setup screens: add `custom_components/tv_guide/translations/<language>.json`, with the same keys as `en.json`.
+Each folder has `en.json` (English, the fallback for every other language), `pl.json`, and `qqq.json`. `qqq.json` is not a language: it tells translators where each text shows and what its placeholders hold. The card files also have an `@metadata` block with the authors.
+
+- **Placeholders** use braces and a name that says what they hold: `{channel_name}`, not `{n}`. Keep them in each translation.
+- **A new text:** add it to `en.json`, `pl.json` and `qqq.json` together. Tests fail when a file misses a key, has an extra key, or has other placeholders than English.
+- **Setup screens:** do not add `strings.json`. Home Assistant uses it only in core. A custom integration reads only `translations/`. hassfest checks `translations/en.json` and does not allow URLs or HTML in the texts.
+
+### Add a language
+
+1. Copy `frontend/i18n/en.json` to `frontend/i18n/<language>.json`, for example `de.json`. Translate the texts and put your name in `@metadata`. The card finds the file by itself.
+2. Copy `custom_components/tv_guide/translations/en.json` to `translations/<language>.json` and translate it.
+3. Read `qqq.json` in both folders when a text is not clear.
+4. Run the tests: they check that your files have the same keys and placeholders as English.
+
+The file name is the Home Assistant language code. The card uses the file for the exact code (`pt-BR`) or for the base language (`pt`), else English.
 
 ## Release
+
+`codeowners` in `manifest.json` lists the maintainers. Do not add yourself in a pull request.
 
 1. Add the changes to [CHANGELOG.md](CHANGELOG.md) under the new version and the release date. Set the same version in `custom_components/tv_guide/manifest.json`.
 2. Merge to `main` and check that CI passes.
@@ -73,7 +89,7 @@ The release workflow first runs all the tests and checks of `ci.yml` and `valida
 
 ## Icon
 
-HA shows the icon from `custom_components/tv_guide/brand/`. The sources are `docs/images/icon.svg` and `docs/images/dark_icon.svg` (a lighter frame for dark themes). After a change, export each SVG as PNG with a transparent background: 256 px as `icon.png` or `dark_icon.png`, and 512 px as `icon@2x.png` or `dark_icon@2x.png`.
+HA shows the icon from `custom_components/tv_guide/brand/`. The sources are `assets/brand/icon.svg` and `assets/brand/dark_icon.svg` (a lighter frame for dark themes). After a change, export each SVG as PNG with a transparent background: 256 px as `icon.png` or `dark_icon.png`, and 512 px as `icon@2x.png` or `dark_icon@2x.png`.
 
 ## CI
 

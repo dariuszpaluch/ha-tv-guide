@@ -94,7 +94,7 @@ The two parts meet only at [api.md](api.md). The card has its own copy of the co
 | `components/` | Lit elements: rows, day chips, the sheet and its two views, the search box. |
 | `controllers/` | The swipe controller for the sheet gestures. |
 | `data/` | Pure functions: guide client, search steps, time and TV day, stale check, logos. |
-| `i18n/` | English and Polish strings, `t()`. |
+| `i18n.ts` | `t()`: picks the language and fills in the placeholders. The texts are in `frontend/i18n/` (`en.json`, `pl.json`, and `qqq.json` with notes for translators). |
 | `utils/` | Text normalizing, match highlighting, logo tone. |
 | `types/` | Contract types (`api.ts`) and the Home Assistant types the card uses (`hass.ts`). |
 
@@ -114,7 +114,7 @@ The two parts meet only at [api.md](api.md). The card has its own copy of the co
 
   A tap on a result opens the channel or the programme. Enter switches to the first result. Programme search starts at 2 characters.
 - **Language** comes from the user's HA profile (`hass.locale.language`). Polish and English are built in. Any other language gets English.
-- **Times** follow the HA profile (Profile → Time format). The HA default ("use language setting") gives 24-hour times, because the card formats English with `en-GB` and Polish with `pl-PL`. The time zone follows the HA profile too (server or device).
+- **Times** follow the HA profile (Profile → Time format). The HA default ("use language setting") gives 24-hour times. For English the card uses the `en-GB` locale, which has the 24-hour clock. The time zone follows the HA profile too (server or device).
 - **Theme.** The card uses only HA theme variables (`--primary-color`, `--card-background-color`, ...). Dark mode for the logo tiles comes from `hass.themes.darkMode`.
 - **Logos** are shown in a 52×30 box. A logo from the card config wins over the icon from the guide. The card checks if a logo is mostly light or mostly dark and puts it on a tile that contrasts. `logo_tile` sets the tile by hand. Logos from the guide load straight from the guide's server, not through HA.
 - **Stale guide.** When the last good download is older than two update intervals, the card shows "Guide from <date, time>" above the list.

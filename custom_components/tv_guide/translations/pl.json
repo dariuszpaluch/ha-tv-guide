@@ -6,6 +6,9 @@
         "description": "Podaj adres pliku XMLTV. Plik może być zwykłym XML, gzip, xz lub zip.",
         "data": {
           "url": "Adres XMLTV"
+        },
+        "data_description": {
+          "url": "Zwykły XML albo plik .gz, .xz lub .zip. Taki adres podaje wiele serwisów z programem TV i dostawców IPTV."
         }
       },
       "channels": {
@@ -13,6 +16,9 @@
         "description": "Wybierz kanały, które mają być w przewodniku.",
         "data": {
           "channels": "Kanały"
+        },
+        "data_description": {
+          "channels": "Tylko te kanały są trzymane w pamięci i na dysku. Możesz je zmienić później w opcjach."
         }
       }
     },
@@ -32,6 +38,10 @@
         "data": {
           "channels": "Kanały",
           "update_interval": "Odstęp aktualizacji (godziny)"
+        },
+        "data_description": {
+          "channels": "Tylko te kanały są trzymane w pamięci i na dysku. Nowy kanał dostanie program po ponownym pobraniu przewodnika, zaraz po zapisaniu.",
+          "update_interval": "Jak często pobierać przewodnik, od 1 do 48 godzin."
         }
       }
     },

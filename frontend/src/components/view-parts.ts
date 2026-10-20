@@ -66,7 +66,7 @@ export const renderCloseButton = (label: string, onClick: () => void): TemplateR
 export const renderSwitchAction = (host: EventTarget, channel: ChannelConfig, t: Translate): TemplateResult => html`
   <div class="actions">
     <button class="btn" @click=${() => fire(host, 'tvg-switch', { number: channel.number })}>
-      ${icon('play')} ${t('switchTo', channel.number)}
+      ${icon('play')} ${t('switchTo', { channel_number: channel.number })}
     </button>
   </div>
 `;
