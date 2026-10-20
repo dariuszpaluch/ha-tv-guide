@@ -105,7 +105,7 @@ async def test_added_channel_keeps_the_old_ones_while_the_source_is_down(
 
 
 async def test_added_channel_gets_programmes_after_the_background_refresh(
-    hass, aioclient_mock, mock_entry, guide_xml
+    hass, aioclient_mock, mock_entry, guide_xml, clock_at_now
 ) -> None:
     await GuideStore(hass, mock_entry.entry_id).async_save(_stored_for(guide_xml, "TVN"))
     aioclient_mock.get(URL, content=guide_xml)

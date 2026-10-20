@@ -319,7 +319,7 @@ async def test_downloads_run_at_most_four_at_once(hass, loaded_entry, monkeypatc
         nonlocal running, peak
         running += 1
         peak = max(peak, running)
-        await asyncio.sleep(0.01)
+        await asyncio.sleep(0)  # yield to the other downloads; the frozen clock never ends a real sleep
         running -= 1
 
     monkeypatch.setattr(cache, "_download", slow_download)

@@ -70,9 +70,17 @@ def mock_entry(hass: HomeAssistant) -> MockConfigEntry:
 
 @pytest.fixture
 async def loaded_entry(
-    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker, guide_xml: bytes, mock_entry: MockConfigEntry
+    hass: HomeAssistant,
+    aioclient_mock: AiohttpClientMocker,
+    guide_xml: bytes,
+    mock_entry: MockConfigEntry,
+    clock_at_now: FrozenDateTimeFactory,
 ) -> MockConfigEntry:
-    """`mock_entry` set up against the fixture source."""
+    """`mock_entry` set up against the fixture source, with the clock at `NOW`.
+
+    The parser drops programmes that ended a day before the real time, so without the
+    frozen clock the fixture guide loses programmes as the real date moves on.
+    """
     aioclient_mock.get(URL, content=guide_xml)
     assert await hass.config_entries.async_setup(mock_entry.entry_id)
     await hass.async_block_till_done()
