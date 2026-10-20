@@ -21,7 +21,7 @@ export interface ZapOptions {
 export const renderZap = (host: EventTarget, { channel, logo, switching, darkMode, t }: ZapOptions): TemplateResult => html`
   <button
     class="zap ${switching ? 'switching' : ''}"
-    aria-label=${t('switchTo', channel.number)}
+    aria-label=${t('switchTo', { channel_number: channel.number })}
     @click=${() => fire(host, 'tvg-switch', { number: channel.number })}
   >
     <span class="play">${icon('play')}</span>

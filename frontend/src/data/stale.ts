@@ -16,7 +16,7 @@ export const isStale = (info: GuideInfo, now: number): boolean =>
 /**
  * Day and time of the last good download, like "17 Oct, 12:30".
  * @param info Answer of `tv_guide/info`.
- * @param locale `en-GB` or `pl-PL`.
+ * @param locale A locale from `localeOf`, such as `en-GB` or `pl`.
  * @param timeZone IANA time zone name.
  * @param use12Hour `true` for the 12-hour clock.
  */

@@ -252,7 +252,7 @@ export class TvgProgrammeView extends LitElement {
       ${shown.map(({ airing, config, entry }) => this.renderAiring(airing, config, entry))}
       ${!open && rows.length > AIRINGS_SHOWN
         ? html`<button class="text-btn" @click=${() => (this.expanded = { ...this.expanded, [key]: true })}>
-            ${this.t('showAll', rows.length)}
+            ${this.t('showAll', { count: rows.length })}
           </button>`
         : nothing}
     `;
@@ -274,7 +274,7 @@ export class TvgProgrammeView extends LitElement {
     if (!same.length && !others.length) return nothing;
     return html`<section class="airings">
       <h4>${t('moreAirings')}</h4>
-      ${this.renderGroup('same', t('onChannel', channel.name), same)}
+      ${this.renderGroup('same', t('onChannel', { channel_name: channel.name }), same)}
       ${this.renderGroup('others', t('onOtherChannels'), others)}
     </section>`;
   }

@@ -48,7 +48,7 @@ export class TvgProgrammeRow extends LitElement {
 
   /** "until 20:00" while on air; otherwise when it starts. */
   private whenLabel(programme: Programme, live: boolean): string {
-    if (live) return this.t('until', formatTime(Date.parse(programme.stop), this.locale, this.timeZone, this.hour12));
+    if (live) return this.t('until', { time: formatTime(Date.parse(programme.stop), this.locale, this.timeZone, this.hour12) });
     return whenText(programme, this.now, this.todayKey, this.locale, this.timeZone, this.hour12, this.startHour, this.t);
   }
 
@@ -60,7 +60,7 @@ export class TvgProgrammeRow extends LitElement {
       ${renderZap(this, { channel, logo: this.logo, switching: false, darkMode: this.darkMode, t })}
       <button
         class="info"
-        aria-label=${t('details', programme.title)}
+        aria-label=${t('details', { name: programme.title })}
         @click=${() => fire(this, 'tvg-open-programme', { number: channel.number, programmeId: programme.id })}
       >
         <span class="col">

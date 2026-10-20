@@ -199,7 +199,7 @@ export class TvgChannelView extends LitElement {
       ></tvg-day-chips>
       <div class="sched">
         ${ended.length
-          ? html`<button class="text-btn" @click=${() => fire(this, 'tvg-show-earlier', {})}>${this.t('earlier', ended.length)}</button>`
+          ? html`<button class="text-btn" @click=${() => fire(this, 'tvg-show-earlier', {})}>${this.t('earlier', { count: ended.length })}</button>`
           : nothing}
         ${shown.map((p) => this.renderSlot(p))}
       </div>
