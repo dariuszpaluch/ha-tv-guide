@@ -4,7 +4,7 @@ Thank you for helping. This file tells you how to set up the project, how to tes
 
 ## What you need
 
-- Python 3.14.2+ (the version Home Assistant 2026.10 needs) and [uv](https://docs.astral.sh/uv/).
+- [uv](https://docs.astral.sh/uv/). It installs the Python from `.python-version` (3.14, the version Home Assistant 2026.10 runs on).
 - Node.js 22+ and [pnpm](https://pnpm.io).
 
 ## Commands
