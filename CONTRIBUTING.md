@@ -73,7 +73,7 @@ The release workflow first runs all the tests and checks of `ci.yml` and `valida
 
 ## Icon
 
-HA shows the icon from `custom_components/tv_guide/brand/`. The sources are `docs/images/icon.svg` and `docs/images/dark_icon.svg` (a lighter frame for dark themes). After a change, export each SVG as PNG with a transparent background: 256 px as `icon.png` or `dark_icon.png`, and 512 px as `icon@2x.png` or `dark_icon@2x.png`.
+HA shows the icon from `custom_components/tv_guide/brand/`. The sources are `assets/brand/icon.svg` and `assets/brand/dark_icon.svg` (a lighter frame for dark themes). After a change, export each SVG as PNG with a transparent background: 256 px as `icon.png` or `dark_icon.png`, and 512 px as `icon@2x.png` or `dark_icon@2x.png`.
 
 ## CI
 
