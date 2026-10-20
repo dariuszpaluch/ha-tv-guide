@@ -23,3 +23,7 @@ extend-exclude = ["docs"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
+
+[tool.coverage.report]
+# The tests cover 99% now. The check fails when a change adds much untested code.
+fail_under = 95

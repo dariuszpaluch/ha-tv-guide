@@ -53,6 +53,7 @@ You do not need a running Home Assistant.
 | Search, schedule, airings | `search.py` (server), `frontend/src/data/search.ts` (card steps) |
 | A WebSocket command | `docs/api.md` first, then `websocket_api.py` and `frontend/src/types/api.ts` |
 | Posters | `images.py` |
+| Diagnostics for bug reports | `diagnostics.py`; never show the full guide URL, use `safe_url` |
 | Setup screens | `config_flow.py`, `translations/` (`en.json`, `pl.json`, `qqq.json`) |
 | Card config | `frontend/src/config.ts`, `README.md`, `examples/card.yaml` |
 | Card look | `frontend/src/components/`, `frontend/src/tv-guide-styles.ts` |

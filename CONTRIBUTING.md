@@ -95,5 +95,9 @@ HA shows the icon from `custom_components/tv_guide/brand/`. The sources are `ass
 
 All jobs run on GitHub-hosted runners (`ubuntu-latest`). Each push runs:
 
-- the integration tests and lint, and the card tests, check and build (`ci.yml`);
+- the integration tests and lint, and the card tests, check and build (`ci.yml`). The integration tests must cover at least 95% of the code (`fail_under` in `pyproject.toml`);
 - [hassfest](https://developers.home-assistant.io/blog/2020/04/16/hassfest/) and the [HACS action](https://hacs.xyz/docs/publish/action) (`validate.yml`). They check `manifest.json`, the translations, `hacs.json` and the repository settings that HACS needs.
+
+Dependabot opens pull requests for new versions of the GitHub Actions, the card packages and the Python dev packages, once a week (`.github/dependabot.yml`).
+
+A security problem goes to a private advisory, not to an issue: see [SECURITY.md](SECURITY.md).

@@ -159,12 +159,60 @@ Outside Poland:
 - The card is in English and Polish. Other languages get English. Translations are welcome, see [CONTRIBUTING.md](CONTRIBUTING.md#add-a-language).
 - [examples/card.yaml](examples/card.yaml) is for the Polish guide. For another guide, copy the channel ids from the integration options.
 
-## Good to know
+## How the guide updates
 
-- The card shows "The guide is not loaded yet." until the integration has downloaded the guide once. After that it works also when the source is down.
-- When the last good download is old, the card shows "Guide from <date, time>" above the list.
-- A channel that is in the card but not selected in the integration shows "Not selected in the integration".
-- The browser loads channel logos from the guide straight from the guide's server. If your Home Assistant uses https (for example Nabu Casa), the browser can block a plain `http` logo. Set `logo` for each channel to fix this, and for a better look.
+- The integration downloads the guide when you add it, then every update interval (12 hours by default, 1 to 48 hours).
+- It keeps the last good guide on disk. After a restart it uses that copy at once, then downloads a new one.
+- When a download fails, the card keeps the current guide, and HA logs an error (once, until a download works again). When the last good download is older than two update intervals, the card shows "Guide from <date, time>" above the list.
+- The card asks the integration for new data every 60 seconds, so the programme on now moves on by itself.
+- When you select a new channel in the options, it gets its programmes from the download that runs right after you save.
+- Posters are downloaded the first time someone opens them. Copies not used for 7 days are deleted.
+
+## Known limitations
+
+- There is no "yesterday": a cable box cannot play past programmes.
+- The card is in English and Polish. Other languages get English.
+- The guide download can be at most 64 MB (compressed).
+- You cannot change the guide URL of an added guide. Delete the guide and add it again.
+- One card switches one TV: `switch_action` is the same for all channels of a card. For a second TV, add a second card.
+- If your Home Assistant uses https (for example Nabu Casa), the browser can block a channel logo that the guide gives with plain `http`. Set `logo` for those channels.
+
+## Troubleshooting
+
+| You see | What to do |
+| --- | --- |
+| "The guide is not loaded yet." | The integration has not downloaded the guide yet. Wait a moment. If it stays, check the logs (Settings → System → Logs) and the guide URL. |
+| "Add the TV guide integration first." | Add the integration: Settings → Devices & services → Add integration → TV guide. |
+| "No guide" on a channel | The `epg_id` in the card does not match a channel id in the guide. Open the integration options: the list shows `Name (id: ...)` when the id is not the name. |
+| "Not selected in the integration" | Select the channel in the integration options. |
+| "Guide from <date, time>" | The downloads fail. Check the logs and the guide URL. |
+| "Cannot switch to ...: ..." | The switch action failed. Try the same action in Developer tools → Actions, with a channel number in place of `{number}`. |
+| The card is missing or old after an update | Reload the page. In the HA app: Settings → Companion app → Debugging → Reset frontend cache. |
+
+### Debug logs
+
+Open Settings → Devices & services → TV guide, then select ⋮ → **Enable debug logging**. Or add this to `configuration.yaml` and restart:
+
+```yaml
+logger:
+  logs:
+    custom_components.tv_guide: debug
+```
+
+### Diagnostics
+
+Open Settings → Devices & services → TV guide, then select ⋮ → **Download diagnostics**. The file shows the selected channels, the number of programmes per channel, the last download and the last error. It names only the server of the guide URL, not its path or query, so a login in the URL stays private.
+
+### Report a bug
+
+[Open an issue](https://github.com/dariuszpaluch/ha-tv-guide/issues/new/choose). Add the diagnostics file and the debug log.
+
+## Remove
+
+1. Remove the TV guide card from your dashboards.
+2. Open Settings → Devices & services → TV guide, then select ⋮ → **Delete**. This deletes the stored guide. When you delete the last guide, the cached posters are deleted too.
+3. In HACS, open TV guide and select **Remove**. If you installed by hand, delete `<config>/custom_components/tv_guide/`.
+4. Restart Home Assistant.
 
 ## Data and images
 

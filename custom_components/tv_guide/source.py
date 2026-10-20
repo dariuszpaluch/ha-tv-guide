@@ -7,6 +7,7 @@ import zipfile
 from typing import IO
 
 import aiohttp
+from yarl import URL
 
 MAX_SOURCE_BYTES = 64 * 1024 * 1024
 CHUNK_BYTES = 64 * 1024
@@ -18,6 +19,19 @@ ZIP_MAGIC = b"PK\x03\x04"
 
 class SourceError(Exception):
     """The XMLTV source cannot be downloaded or opened."""
+
+
+def safe_url(url: str) -> str:
+    """Return only the scheme, host and port of `url`, for logs and error messages.
+
+    IPTV providers often put the login in the path, the query or the user part
+    of the guide URL. Users paste their logs into issues, so logs show only the server.
+    """
+    try:
+        origin = URL(url).origin()
+    except ValueError:
+        return "the source"
+    return str(origin)
 
 
 async def fetch_source(
@@ -40,16 +54,17 @@ async def fetch_source(
     try:
         async with session.get(url, timeout=aiohttp.ClientTimeout(total=timeout)) as response:
             if response.status >= 400:
-                raise SourceError(f"HTTP {response.status} from {url}")
+                raise SourceError(f"HTTP {response.status} from {safe_url(url)}")
             async for chunk in response.content.iter_chunked(CHUNK_BYTES):
                 size += len(chunk)
                 if size > max_bytes:
                     raise SourceError(f"The source is larger than {max_bytes} bytes")
                 chunks.append(chunk)
     except TimeoutError as err:
-        raise SourceError(f"Timeout while downloading {url}") from err
+        raise SourceError(f"Timeout while downloading from {safe_url(url)}") from err
     except aiohttp.ClientError as err:
-        raise SourceError(f"Cannot download {url}: {err}") from err
+        # The aiohttp message can repeat the full URL, so it is left out.
+        raise SourceError(f"Cannot download from {safe_url(url)}: {type(err).__name__}") from err
     return b"".join(chunks)
 
 

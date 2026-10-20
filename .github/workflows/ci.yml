@@ -6,6 +6,15 @@ on:
   # The release workflow runs these jobs first.
   workflow_call:
 
+permissions:
+  contents: read
+
+# A new push to the same branch cancels the older run. The group name starts with `ci-`, so the
+# release workflow, which runs this and validate.yml at the same time, never cancels its own checks.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   integration:
     runs-on: ubuntu-latest
@@ -14,7 +23,7 @@ jobs:
       # uv reads `requires-python` from pyproject.toml and installs a matching Python.
       - uses: astral-sh/setup-uv@v10.3.0
       - run: uv sync
-      - run: uv run pytest
+      - run: uv run pytest --cov=custom_components/tv_guide --cov-report=term-missing
       - run: uv run ruff check .
       - run: uv run ruff format --check .
 

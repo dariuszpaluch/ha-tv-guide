@@ -56,6 +56,7 @@ The two parts meet only at [api.md](api.md). The card has its own copy of the co
 | `search.py` | Queries: on now, schedule, search, more airings, title matching. |
 | `websocket_api.py` | The `tv_guide/*` commands from the contract. |
 | `images.py` | Poster view and poster cache. |
+| `diagnostics.py` | The diagnostics file for bug reports. It names only the server of the guide URL. |
 
 ### Config entry
 
@@ -75,7 +76,7 @@ The two parts meet only at [api.md](api.md). The card has its own copy of the co
 
 - After each good download, the guide is saved with `Store`, filtered to the selected channels (about 10 MB of JSON for 120 channels with descriptions). Building and reading this dict runs in the executor.
 - At start, the stored guide is loaded first, then the download runs. After a change of the channel selection, the stored guide is cut to the new selection. A new channel has no programmes until the next good download. If no stored channel is selected any more, the setup waits for the download.
-- A failed download keeps the current guide and logs a warning. `tv_guide/info` reports `last_success`, and the card shows a notice when it is old.
+- A failed download keeps the current guide. The HA coordinator logs an error once, until a download works again. `tv_guide/info` reports `last_success`, and the card shows a notice when it is old.
 
 ### Poster cache
 
@@ -83,6 +84,7 @@ The two parts meet only at [api.md](api.md). The card has its own copy of the co
 - Sizes: `thumb` is 336 px wide (the 112 px poster in the schedule, at 3x). `large` is 1200 px wide (the programme view, at 3x). Never wider than the source. JPEG, quality 80. Pillow runs in the executor.
 - Folder: `<config>/.cache/tv_guide/images/`. HA backups skip `.cache/*`, so posters do not fill the backups.
 - Once a day, files not served for 7 days are deleted.
+- When the last entry is removed, the poster folder is deleted. The daily cleanup runs only while the integration is loaded, so the posters would stay forever.
 - When the source fails and there is no copy on disk, the view answers `404` and the card shows a placeholder icon.
 - The poster URL needs no HA login, because an `<img>` tag cannot send a token. The view serves only ids of posters in a loaded guide, and the ids are hashes that cannot be guessed.
 
