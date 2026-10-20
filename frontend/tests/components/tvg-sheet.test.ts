@@ -1,7 +1,6 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import { tEn } from '../fixtures';
-import '../../src/components/tvg-sheet';
-import type { TvgSheet } from '../../src/components/tvg-sheet';
+import { SHEET_CLOSE_MS, type TvgSheet } from '../../src/components/tvg-sheet';
 
 const mount = async (props: { open?: boolean; showProgramme?: boolean } = {}) => {
   const el = document.createElement('tvg-sheet') as TvgSheet;
@@ -13,7 +12,7 @@ const mount = async (props: { open?: boolean; showProgramme?: boolean } = {}) =>
     <div slot="programme"><header>Programme</header><div class="content">Details</div></div>`;
   document.body.append(el);
   await el.updateComplete;
-  const part = (selector: string) => el.shadowRoot?.querySelector(selector) as HTMLElement;
+  const part = <T extends HTMLElement = HTMLElement>(selector: string) => el.shadowRoot?.querySelector(selector) as T;
   for (const selector of ['.sheet', '.view.prog']) {
     Object.defineProperty(part(selector), 'offsetWidth', { value: 300 });
     Object.defineProperty(part(selector), 'offsetHeight', { value: 500 });
@@ -49,20 +48,32 @@ const drag = (el: Element, from: [number, number], to: [number, number], ms: num
 const slotted = (el: TvgSheet, slot: string, selector: string) =>
   el.querySelector(`[slot="${slot}"] ${selector}`) as HTMLElement;
 
-afterEach(() => document.body.replaceChildren());
+const cancel = (el: TvgSheet): Event => {
+  const event = new Event('cancel', { cancelable: true });
+  el.shadowRoot?.querySelector('dialog')?.dispatchEvent(event);
+  return event;
+};
 
-test('scrim click fires tvg-close', async () => {
-  const { part, onClose } = await mount();
-  part('.scrim').click();
+afterEach(() => {
+  vi.useRealTimers();
+  document.body.replaceChildren();
+});
+
+test('a click on the backdrop fires tvg-close, a click inside a view does not', async () => {
+  const { el, part, onClose } = await mount();
+  slotted(el, 'channel', '.content').click();
+  expect(onClose).not.toHaveBeenCalled();
+  // The browser gives a backdrop click to the dialog itself.
+  part('.sheet').click();
   expect(onClose).toHaveBeenCalledTimes(1);
 });
 
-test('Escape fires tvg-close, other keys do not', async () => {
-  const { el, onClose } = await mount();
-  el.dispatchEvent(new KeyboardEvent('keydown', { key: 'a' }));
-  expect(onClose).not.toHaveBeenCalled();
-  el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+test('Escape fires tvg-close and keeps the dialog open for the slide-away', async () => {
+  const { el, part, onClose } = await mount();
+  const event = cancel(el);
+  expect(event.defaultPrevented).toBe(true);
   expect(onClose).toHaveBeenCalledTimes(1);
+  expect(part<HTMLDialogElement>('.sheet').open).toBe(true);
 });
 
 test('dragging the grab bar down fires tvg-close', async () => {
@@ -106,37 +117,78 @@ test('a right swipe does not fire tvg-back while the programme view is hidden', 
   expect(onBack).not.toHaveBeenCalled();
 });
 
-test('the scrim follows a drag down and returns when it ends', async () => {
+test('the backdrop follows a drag down and returns when it ends', async () => {
   const { part } = await mount();
   const grab = part('.grab');
   grab.dispatchEvent(pointer('pointerdown', 150, 0, 1000));
   grab.dispatchEvent(pointer('pointermove', 150, 250, 1010));
-  expect(part('.scrim').style.opacity).toBe('0.5');
+  expect(part('.sheet').style.getPropertyValue('--tvg-scrim')).toBe('0.5');
   grab.dispatchEvent(pointer('pointercancel', 150, 250, 1020));
-  expect(part('.scrim').style.opacity).toBe('');
+  expect(part('.sheet').style.getPropertyValue('--tvg-scrim')).toBe('');
 });
 
-test('is a labelled dialog and reflects the open state', async () => {
+test('is a labelled modal dialog and reflects the open state', async () => {
   const { el, part } = await mount({ open: false });
-  expect(part('.sheet').getAttribute('role')).toBe('dialog');
-  expect(part('.sheet').getAttribute('aria-label')).toBe('Channel details');
-  expect(part('.sheet').hasAttribute('inert')).toBe(true);
-  expect(part('.sheet').classList.contains('open')).toBe(false);
+  const sheet = part<HTMLDialogElement>('.sheet');
+  const showModal = vi.spyOn(sheet, 'showModal');
+  expect(sheet.localName).toBe('dialog');
+  expect(sheet.getAttribute('aria-label')).toBe('Channel details');
+  expect(sheet.open).toBe(false);
+  expect(sheet.hasAttribute('inert')).toBe(true);
+  expect(sheet.classList.contains('open')).toBe(false);
 
   el.open = true;
   el.showProgramme = true;
   await el.updateComplete;
-  expect(part('.sheet').hasAttribute('inert')).toBe(false);
-  expect(part('.sheet').classList.contains('open')).toBe(true);
-  expect(part('.sheet').classList.contains('prog-open')).toBe(true);
+  expect(showModal).toHaveBeenCalledOnce();
+  expect(sheet.open).toBe(true);
+  expect(sheet.hasAttribute('inert')).toBe(false);
+  expect(sheet.classList.contains('open')).toBe(true);
+  expect(sheet.classList.contains('prog-open')).toBe(true);
 });
 
-test('swipes still work after the sheet is moved in the DOM', async () => {
+test('the dialog closes when the slide-away is over, and opening again in time keeps it open', async () => {
+  vi.useFakeTimers();
+  const { el, part, onClose } = await mount();
+  const sheet = part<HTMLDialogElement>('.sheet');
+  el.open = false;
+  await el.updateComplete;
+  expect(sheet.classList.contains('open')).toBe(false);
+  expect(sheet.open).toBe(true);
+  vi.advanceTimersByTime(SHEET_CLOSE_MS);
+  expect(sheet.open).toBe(false);
+  // The parent closed the sheet, so it hears nothing back.
+  expect(onClose).not.toHaveBeenCalled();
+
+  el.open = true;
+  await el.updateComplete;
+  el.open = false;
+  await el.updateComplete;
+  el.open = true;
+  await el.updateComplete;
+  vi.advanceTimersByTime(SHEET_CLOSE_MS);
+  expect(sheet.open).toBe(true);
+});
+
+test('a dialog that the browser closes on its own fires tvg-close', async () => {
+  const { part, onClose } = await mount();
+  part<HTMLDialogElement>('.sheet').close();
+  expect(onClose).toHaveBeenCalledTimes(1);
+});
+
+test('the toast slot is inside the dialog, so the note shows above the backdrop', async () => {
+  const { part } = await mount();
+  expect(part('.sheet slot[name="toast"]')).not.toBeNull();
+});
+
+test('swipes still work and the dialog opens again after the sheet is moved in the DOM', async () => {
   const { el, part, onClose, onBack } = await mount({ showProgramme: true });
   const parent = document.createElement('section');
   document.body.append(parent);
   parent.append(el);
   await el.updateComplete;
+  expect(part<HTMLDialogElement>('.sheet').open).toBe(true);
+  expect(onClose).not.toHaveBeenCalled();
 
   drag(part('.grab'), [150, 0], [150, 200], 400);
   expect(onClose).toHaveBeenCalledTimes(1);
@@ -146,6 +198,6 @@ test('swipes still work after the sheet is moved in the DOM', async () => {
 
 test('Escape does nothing while the sheet is closed', async () => {
   const { el, onClose } = await mount({ open: false });
-  el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+  cancel(el);
   expect(onClose).not.toHaveBeenCalled();
 });

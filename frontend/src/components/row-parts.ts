@@ -81,7 +81,8 @@ export const rowStyles = [
     .number {
       min-width: 3ch;
       text-align: right;
-      color: var(--secondary-text-color);
+      color: var(--primary-color);
+      font-weight: 500;
     }
     .zap .play {
       position: absolute;

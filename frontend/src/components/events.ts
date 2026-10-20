@@ -10,7 +10,6 @@ export interface TvgEventDetails {
   'tvg-day': { key: string };
   'tvg-back': Record<string, never>;
   'tvg-close': Record<string, never>;
-  'tvg-show-earlier': Record<string, never>;
   'tvg-reminder': { programmeId: string; on: boolean };
 }
 
@@ -24,7 +23,6 @@ declare global {
     'tvg-day': CustomEvent<TvgEventDetails['tvg-day']>;
     'tvg-back': CustomEvent<TvgEventDetails['tvg-back']>;
     'tvg-close': CustomEvent<TvgEventDetails['tvg-close']>;
-    'tvg-show-earlier': CustomEvent<TvgEventDetails['tvg-show-earlier']>;
     'tvg-reminder': CustomEvent<TvgEventDetails['tvg-reminder']>;
   }
 }

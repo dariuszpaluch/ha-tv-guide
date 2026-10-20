@@ -1,10 +1,10 @@
-import { afterEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import type { ChannelConfig } from '../../src/config';
 import { NOW, WAW, fakty, faktyTomorrow, nocneKino, poKinie, sport, tEn, uwagaTomorrow } from '../fixtures';
 import type { Programme } from '../../src/types/api';
 import '../../src/components/tvg-channel-view';
 import { viewStyles } from '../../src/components/view-parts';
-import type { TvgChannelView } from '../../src/components/tvg-channel-view';
+import { scrollAnchor, type TvgChannelView } from '../../src/components/tvg-channel-view';
 
 vi.mock('../../src/utils/logo-tone', () => ({ measureLogo: vi.fn(() => 'mixed') }));
 
@@ -24,7 +24,6 @@ const mount = async (props: Partial<TvgChannelView> = {}) => {
     days: ['2026-10-19', '2026-10-20'],
     selectedDay: '2026-10-19',
     todayKey: '2026-10-19',
-    showEarlier: false,
     now: NOW,
     t: tEn,
     locale: 'en-GB',
@@ -45,34 +44,113 @@ const $$ = <T extends Element>(el: TvgChannelView, selector: string) => [...(el.
 
 afterEach(() => document.body.replaceChildren());
 
-test('today hides ended programmes behind "Show N earlier"', async () => {
+test('today shows the whole day, with the ended programmes marked as past', async () => {
   const el = await mount();
-  expect($$(el, '.slot').map((s) => s.querySelector('.title')?.textContent)).toEqual(['Fakty', 'Sport']);
-  expect($(el, '.text-btn')?.textContent?.trim()).toBe('Show 2 earlier');
-});
-
-test('a click on "Show N earlier" fires tvg-show-earlier', async () => {
-  const el = await mount();
-  const onEarlier = vi.fn();
-  el.addEventListener('tvg-show-earlier', onEarlier);
-  $<HTMLButtonElement>(el, '.text-btn')?.click();
-  expect(onEarlier).toHaveBeenCalledOnce();
-});
-
-test('with showEarlier the ended programmes show and the button is gone', async () => {
-  const el = await mount({ showEarlier: true });
-  expect($$(el, '.slot')).toHaveLength(4);
-  expect($(el, '.slot.past')).not.toBeNull();
+  expect($$(el, '.slot .title').map((s) => s.textContent)).toEqual(['Rano', 'Wcześniej', 'Fakty', 'Sport']);
+  expect($$(el, '.slot.past .title').map((s) => s.textContent)).toEqual(['Rano', 'Wcześniej']);
   expect($(el, '.text-btn')).toBeNull();
 });
 
-test('another day shows all its programmes and no "earlier" button', async () => {
+test('another day shows all its programmes', async () => {
   const el = await mount({
     programmes: [...today, faktyTomorrow, uwagaTomorrow],
     selectedDay: '2026-10-20',
   });
   expect($$(el, '.slot .title').map((s) => s.textContent)).toEqual(['Fakty', 'Uwaga']);
-  expect($(el, '.text-btn')).toBeNull();
+});
+
+describe('scrollAnchor', () => {
+  test('is the focused programme, on any day', () => {
+    expect(scrollAnchor(today, sport.id, NOW, true)).toBe(3);
+    expect(scrollAnchor(today, ended1.id, NOW, false)).toBe(0);
+  });
+
+  test('without a focused programme, on today, is the first programme that has not ended', () => {
+    expect(scrollAnchor(today, '', NOW, true)).toBe(2);
+    expect(scrollAnchor(today, 'not-on-this-day', NOW, true)).toBe(2);
+  });
+
+  test('is the top on another day without a focused programme, or when every programme has ended', () => {
+    expect(scrollAnchor(today, '', NOW, false)).toBe(-1);
+    expect(scrollAnchor([ended1, ended2], '', NOW, true)).toBe(-1);
+  });
+});
+
+describe('scrolling the schedule', () => {
+  const ROW_PX = 60;
+  const CHIPS_PX = 40;
+  const VIEW_PX = 260;
+
+  // happy-dom has no layout: each slot is ROW_PX high and placed under the chips, by its index.
+  beforeEach(() => {
+    vi.spyOn(HTMLElement.prototype, 'offsetTop', 'get').mockImplementation(function (this: HTMLElement) {
+      return this.classList.contains('slot') ? CHIPS_PX + [...(this.parentElement?.children ?? [])].indexOf(this) * ROW_PX : 0;
+    });
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(function (this: HTMLElement) {
+      if (this.classList.contains('slot')) return ROW_PX;
+      return this.localName === 'tvg-day-chips' ? CHIPS_PX : 0;
+    });
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(VIEW_PX);
+  });
+  afterEach(() => vi.restoreAllMocks());
+
+  const frame = () => new Promise((resolve) => requestAnimationFrame(resolve));
+  const scrollOf = (el: TvgChannelView) => $<HTMLElement>(el, '.scroll') as HTMLElement;
+  const settle = async (el: TvgChannelView) => {
+    await el.updateComplete;
+    await frame();
+    return scrollOf(el).scrollTop;
+  };
+
+  test('today opens with the programme before the one on now at the top', async () => {
+    const el = await mount();
+    // Wcześniej (index 1) is the top row, Fakty (on now) is under it.
+    expect(await settle(el)).toBe(ROW_PX);
+  });
+
+  test('scrolls when the schedule arrives', async () => {
+    const el = await mount({ programmes: [], loading: true });
+    expect(await settle(el)).toBe(0);
+    el.programmes = today;
+    el.loading = false;
+    expect(await settle(el)).toBe(ROW_PX);
+  });
+
+  test('a focused programme is the anchor, with the one before it at the top', async () => {
+    const el = await mount({ focusId: sport.id });
+    expect(await settle(el)).toBe(2 * ROW_PX);
+  });
+
+  test('another day opens at the top', async () => {
+    const el = await mount();
+    await settle(el);
+    el.programmes = [...today, faktyTomorrow, uwagaTomorrow];
+    el.selectedDay = '2026-10-20';
+    expect(await settle(el)).toBe(0);
+  });
+
+  test('a new focus on a row the user can see does not move the list', async () => {
+    const el = await mount();
+    expect(await settle(el)).toBe(ROW_PX);
+    // Fakty and Sport are both in view.
+    el.focusId = sport.id;
+    expect(await settle(el)).toBe(ROW_PX);
+  });
+
+  test('a new focus on a row out of view scrolls to it', async () => {
+    const el = await mount();
+    expect(await settle(el)).toBe(ROW_PX);
+    el.focusId = ended1.id;
+    expect(await settle(el)).toBe(0);
+  });
+
+  test('the minute refresh does not move the list', async () => {
+    const el = await mount();
+    await settle(el);
+    scrollOf(el).scrollTop = 7;
+    el.now = NOW + 60e3;
+    expect(await settle(el)).toBe(7);
+  });
 });
 
 test('the live programme has the bigger poster, a description and a progress bar', async () => {
@@ -103,7 +181,7 @@ test('a click on a programme fires tvg-open-programme', async () => {
   const el = await mount();
   const onOpen = vi.fn();
   el.addEventListener('tvg-open-programme', (e) => onOpen(e.detail));
-  $$<HTMLButtonElement>(el, '.slot')[1]?.click();
+  $$<HTMLButtonElement>(el, '.slot')[3]?.click();
   expect(onOpen).toHaveBeenCalledWith({ number: 5, programmeId: sport.id });
 });
 
@@ -173,14 +251,13 @@ describe('programmes across the TV-day start', () => {
     const el = await mount({ programmes: [night, earlyNews, morning], now: AT_0510 });
     expect($$(el, '.slot .title').map((s) => s.textContent)).toEqual(['Poranek', 'Rano']);
     expect($(el, '.slot.live .title')?.textContent).toBe('Poranek');
-    expect($(el, '.text-btn')).toBeNull();
   });
 
-  test('"Show N earlier" still counts only ended programmes', async () => {
+  test('a programme that ended after the day start is listed as past', async () => {
     const ended = earlier('Skończony', '2026-10-19T05:00:00+02:00', '2026-10-19T05:05:00+02:00');
     const el = await mount({ programmes: [ended, earlyNews, morning], now: AT_0510 });
-    expect($(el, '.text-btn')?.textContent?.trim()).toBe('Show 1 earlier');
-    expect($$(el, '.slot .title').map((s) => s.textContent)).toEqual(['Poranek', 'Rano']);
+    expect($$(el, '.slot .title').map((s) => s.textContent)).toEqual(['Skończony', 'Poranek', 'Rano']);
+    expect($$(el, '.slot.past .title').map((s) => s.textContent)).toEqual(['Skończony']);
   });
 
   test('the same programme is also listed on the previous day', async () => {

@@ -23,7 +23,6 @@
   "minutes": "A duration under one hour. {minutes} is a whole number. Used inside \"left\" and \"in\".",
   "today": "Day chip for today in the channel schedule.",
   "tomorrow": "Day chip for tomorrow in the channel schedule.",
-  "earlier": "Button that shows the programmes of today that have ended. {count} is how many there are, always 1 or more.",
   "switchTo": "Button that switches the TV to the channel. {channel_number} is the channel number on the box, such as 5 or 5.1.",
   "switching": "Short message while the TV switches. {channel_number} is the channel number, {channel_name} is the channel name.",
   "moreAirings": "Heading of the list of other airings of the same programme, in the programme details.",

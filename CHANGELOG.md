@@ -6,6 +6,11 @@
 
 - Set or remove a reminder with the bell in programme details. A bell under the time marks it in the channel schedule.
 - Shows a warning when no phone is found for your HA user.
+- Channel details open full screen on a phone and as a centered dialog on a bigger screen. Before, they opened inside the card.
+- The schedule shows the whole day and opens at the programme on now, with one programme above it. "Show N earlier" is gone.
+- After you close a programme, the schedule shows that programme. A new day starts at the top.
+- The card has no frame around the search box and the list, so it lines up with the other cards.
+- The channel numbers in the list are blue.
 
 ### Integration
 

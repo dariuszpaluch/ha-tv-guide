@@ -43,7 +43,7 @@ describe('language and locale', () => {
 describe('translator', () => {
   test('fills in the placeholders', () => {
     expect(translator('pl')('switchTo', { channel_number: 3 })).toBe('Przełącz na 3');
-    expect(translator('en')('earlier', { count: 14 })).toBe('Show 14 earlier');
+    expect(translator('en')('showAll', { count: 14 })).toBe('Show all (14)');
     expect(translator('pl')('showAll', { count: 22 })).toBe('Pokaż wszystkie (22)');
     expect(translator('en')('notLoaded')).toBe('The guide is not loaded yet.');
     expect(translator('en')('switchFailed', { channel_name: 'TVN', error: 'offline' })).toBe(

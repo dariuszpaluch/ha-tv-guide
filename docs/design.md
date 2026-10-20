@@ -124,8 +124,8 @@ The card shows a bell in programme details only when the start is more than 5 mi
 ### Behaviour
 
 - **List row with two tap areas.** The left area (number and logo) switches the channel. The right area (name, programme on now, progress bar, `›`) opens the channel details.
-- **Details sheet with two views.**
-  - Channel view: day chips, then the schedule for that day. Each programme has a small poster. The programme on now has a bigger poster, two lines of description and a progress bar. Earlier programmes of today are folded behind "Show N earlier".
+- **Details sheet with two views.** The sheet is a native `<dialog>` opened with `showModal()`. The browser shows it above the whole page, so the card and the HA layout cannot clip it. On a phone it fills the screen; on a bigger screen it is a centered dialog.
+  - Channel view: day chips, then the schedule for that day. Each programme has a small poster. The programme on now has a bigger poster, two lines of description and a progress bar. The list scrolls to the open programme, or on today to the programme on now. One programme stays above it, so the user sees what came before. A tap on a visible row does not move the list.
   - Programme view: poster, title, time, time left or start time, category, age rating, year, country, star rating, description and a switch button. It slides over the channel view.
 - **More airings** below the description: other airings of programmes with the same title, soonest first. First on the same channel, then on the other channels of the card. Each group shows 3 airings and "Show all (N)", because a daily series can have more than 20. Programmes shorter than 15 minutes have no "More airings": their titles ("Pogoda", "Sport") match unrelated programmes on other channels.
 - **Gestures.** Swipe right on the programme view to go back. Drag the grab bar or a header down to close the sheet. A drag is never also a tap.

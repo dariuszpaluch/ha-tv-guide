@@ -422,6 +422,38 @@ test('a programme from search opens its channel on its day with the programme vi
   expect($<HTMLElement & { showProgramme: boolean }>(el.shadowRoot, 'tvg-sheet')?.showProgramme).toBe(true);
 });
 
+test('the channel view keeps the programme of the programme view in focus', async () => {
+  const { el } = await mount();
+  $<HTMLElement>(rowOf(el, 5)?.shadowRoot, '.info')?.click();
+  await settle(el);
+  const view = $<HTMLElement & { focusId: string }>(el.shadowRoot, 'tvg-channel-view');
+  expect(view?.focusId).toBe('');
+
+  $$<HTMLElement>(view?.shadowRoot ?? null, '.slot')[1]?.click();
+  await settle(el);
+  expect(view?.focusId).toBe(sport.id);
+  // Back keeps the focus, so the schedule shows the programme the user came from.
+  $<HTMLElement>($(el.shadowRoot, 'tvg-programme-view')?.shadowRoot, '[data-back]')?.click();
+  await settle(el);
+  expect(view?.focusId).toBe(sport.id);
+});
+
+test('the switching note goes into the open sheet, which covers the card', async () => {
+  const { el } = await mount();
+  $<HTMLElement>(rowOf(el, 5)?.shadowRoot, '.info')?.click();
+  await settle(el);
+  $<HTMLElement>($(el.shadowRoot, 'tvg-channel-view')?.shadowRoot, '.actions .btn')?.click();
+  await settle(el);
+  const toasts = $$<HTMLElement>(el.shadowRoot, '.toast');
+  expect(toasts).toHaveLength(1);
+  expect(toasts[0]?.slot).toBe('toast');
+  expect(toasts[0]?.parentElement?.localName).toBe('tvg-sheet');
+
+  $<HTMLElement>($(el.shadowRoot, 'tvg-channel-view')?.shadowRoot, '[data-close]')?.click();
+  await settle(el);
+  expect($(el.shadowRoot, '.toast')?.slot).toBe('');
+});
+
 test('a programme from the airings opens the channel and the day of that airing', async () => {
   const setup = makeHass();
   setup.server.airings = [faktyPolsat];
