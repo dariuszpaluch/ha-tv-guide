@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
-import { en } from './en';
-import { localeOf, resolveLanguage, translator } from './index';
-import { pl } from './pl';
+import { en } from '../../src/i18n/en';
+import { localeOf, resolveLanguage, translator } from '../../src/i18n/index';
+import { pl } from '../../src/i18n/pl';
 
 test('resolveLanguage and localeOf', () => {
   expect(resolveLanguage('pl')).toBe('pl');

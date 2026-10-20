@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { normalize } from './normalize';
+import { normalize } from '../../src/utils/normalize';
 
 // The integration has the same cases in tests/test_search.py: both sides must agree.
 test.each([

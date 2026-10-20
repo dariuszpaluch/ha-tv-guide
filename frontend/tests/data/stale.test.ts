@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
-import { NOW, WAW } from '../test/fixtures';
-import { formatLastSuccess, isStale } from './stale';
+import { NOW, WAW } from '../fixtures';
+import { formatLastSuccess, isStale } from '../../src/data/stale';
 
 const HOUR = 3600e3;
 const info = (hoursAgo: number, interval = 12) => ({

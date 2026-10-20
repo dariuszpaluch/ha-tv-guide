@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
-import type { ChannelConfig, TvGuideConfig } from '../config';
-import { channels } from '../test/fixtures';
-import { channelEntries, guideIcons, logoOf } from './logos';
+import type { ChannelConfig, TvGuideConfig } from '../../src/config';
+import { channels } from '../fixtures';
+import { channelEntries, guideIcons, logoOf } from '../../src/data/logos';
 
 const tvn: ChannelConfig = { number: 5, name: 'TVN', epg_id: 'TVN' };
 const polsat: ChannelConfig = { number: 3, name: 'Polsat', epg_id: 'Polsat', logo: '/local/polsat.png' };

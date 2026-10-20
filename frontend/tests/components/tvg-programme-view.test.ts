@@ -1,11 +1,11 @@
 import { afterEach, expect, test, vi } from 'vitest';
-import type { ChannelConfig } from '../config';
-import { NOW, WAW, fakty, faktyDay3, faktyPolsat, faktyTomorrow, tEn, uwagaTomorrow, zycie } from '../test/fixtures';
-import type { Programme } from '../types/api';
-import './tvg-programme-view';
-import type { TvgProgrammeView } from './tvg-programme-view';
+import type { ChannelConfig } from '../../src/config';
+import { NOW, WAW, fakty, faktyDay3, faktyPolsat, faktyTomorrow, tEn, uwagaTomorrow, zycie } from '../fixtures';
+import type { Programme } from '../../src/types/api';
+import '../../src/components/tvg-programme-view';
+import type { TvgProgrammeView } from '../../src/components/tvg-programme-view';
 
-vi.mock('../utils/logo-tone', () => ({ measureLogo: vi.fn(() => 'mixed') }));
+vi.mock('../../src/utils/logo-tone', () => ({ measureLogo: vi.fn(() => 'mixed') }));
 
 const tvn: ChannelConfig = { number: 5, name: 'TVN', epg_id: 'TVN' };
 const polsat: ChannelConfig = { number: 3, name: 'Polsat', epg_id: 'Polsat' };

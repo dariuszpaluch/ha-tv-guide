@@ -1,9 +1,9 @@
 import { describe, expect, test, vi } from 'vitest';
-import type { TvGuideConfig } from '../config';
-import { fakty, mecz, zycie } from '../test/fixtures';
-import type { Programme } from '../types/api';
-import { GuideError } from './guide-client';
-import { firstResult, matchChannels, SearchRunner, type SearchResults } from './search';
+import type { TvGuideConfig } from '../../src/config';
+import { fakty, mecz, zycie } from '../fixtures';
+import type { Programme } from '../../src/types/api';
+import { GuideError } from '../../src/data/guide-client';
+import { firstResult, matchChannels, SearchRunner, type SearchResults } from '../../src/data/search';
 
 const polsat = { number: 3, name: 'Polsat', epg_id: 'Polsat' };
 const tvn = { number: 4, name: 'TVN', epg_id: 'TVN' };

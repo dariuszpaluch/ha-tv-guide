@@ -1,5 +1,5 @@
 import { expect, test, vi } from 'vitest';
-import { fire } from './events';
+import { fire } from '../../src/components/events';
 
 test('fire sends a typed event that bubbles and crosses shadow roots', () => {
   const host = document.createElement('div');

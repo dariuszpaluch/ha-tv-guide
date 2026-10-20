@@ -1,8 +1,8 @@
 import { afterEach, expect, test, vi } from 'vitest';
-import { measureLogo } from '../utils/logo-tone';
-import { TvgLogo } from './tvg-logo';
+import { measureLogo } from '../../src/utils/logo-tone';
+import { TvgLogo } from '../../src/components/tvg-logo';
 
-vi.mock('../utils/logo-tone', () => ({ measureLogo: vi.fn() }));
+vi.mock('../../src/utils/logo-tone', () => ({ measureLogo: vi.fn() }));
 
 const measure = vi.mocked(measureLogo);
 

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { channelIds, switchServiceCall, validateConfig } from './config';
+import { channelIds, switchServiceCall, validateConfig } from '../src/config';
 
 const switchAction = {
   perform_action: 'script.cable_box_go_to_channel',

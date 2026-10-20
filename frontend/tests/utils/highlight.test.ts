@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { splitMatch } from './highlight';
+import { splitMatch } from '../../src/utils/highlight';
 
 describe('splitMatch', () => {
   test('keeps the original case around the match', () => {

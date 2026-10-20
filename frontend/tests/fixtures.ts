@@ -1,5 +1,5 @@
-import { translator } from '../i18n';
-import type { Channel, Programme } from '../types/api';
+import { translator } from '../src/i18n';
+import type { Channel, Programme } from '../src/types/api';
 
 /** The moment of all card tests: Monday 2026-10-19, 19:20 in Warsaw. */
 export const NOW = Date.parse('2026-10-19T19:20:00+02:00');

@@ -1,7 +1,7 @@
 import { afterEach, expect, test, vi } from 'vitest';
-import { tEn } from '../test/fixtures';
-import './tvg-sheet';
-import type { TvgSheet } from './tvg-sheet';
+import { tEn } from '../fixtures';
+import '../../src/components/tvg-sheet';
+import type { TvgSheet } from '../../src/components/tvg-sheet';
 
 const mount = async (props: { open?: boolean; showProgramme?: boolean } = {}) => {
   const el = document.createElement('tvg-sheet') as TvgSheet;

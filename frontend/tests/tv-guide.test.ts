@@ -1,13 +1,13 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
-import { validateConfig } from './config';
-import { tvDayRange } from './data/time';
-import { NOW, WAW, channels, fakty, faktyDay3, faktyPolsat, faktyTomorrow, mecz, sport, uwagaTomorrow, zycie } from './test/fixtures';
-import type { Channel, Programme } from './types/api';
-import type { HomeAssistant } from './types/hass';
-import './tv-guide';
-import { registerCard, TvGuide } from './tv-guide';
+import { validateConfig } from '../src/config';
+import { tvDayRange } from '../src/data/time';
+import { NOW, WAW, channels, fakty, faktyDay3, faktyPolsat, faktyTomorrow, mecz, sport, uwagaTomorrow, zycie } from './fixtures';
+import type { Channel, Programme } from '../src/types/api';
+import type { HomeAssistant } from '../src/types/hass';
+import '../src/tv-guide';
+import { registerCard, TvGuide } from '../src/tv-guide';
 
-vi.mock('./utils/logo-tone', () => ({ measureLogo: vi.fn(() => 'mixed') }));
+vi.mock('../src/utils/logo-tone', () => ({ measureLogo: vi.fn(() => 'mixed') }));
 
 const SCHEDULE: Programme[] = [fakty, sport, faktyTomorrow, uwagaTomorrow, faktyDay3, zycie, mecz, faktyPolsat];
 const MINUTE = 60e3;

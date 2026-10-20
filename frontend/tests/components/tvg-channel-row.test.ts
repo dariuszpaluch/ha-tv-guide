@@ -1,9 +1,9 @@
 import { afterEach, expect, test, vi } from 'vitest';
-import type { ChannelConfig } from '../config';
-import { NOW, WAW, fakty, tEn, tPl } from '../test/fixtures';
-import { TvgChannelRow } from './tvg-channel-row';
+import type { ChannelConfig } from '../../src/config';
+import { NOW, WAW, fakty, tEn, tPl } from '../fixtures';
+import { TvgChannelRow } from '../../src/components/tvg-channel-row';
 
-vi.mock('../utils/logo-tone', () => ({ measureLogo: vi.fn(() => 'mixed') }));
+vi.mock('../../src/utils/logo-tone', () => ({ measureLogo: vi.fn(() => 'mixed') }));
 
 const tvp: ChannelConfig = { number: 1, name: 'TVP 1 HD' };
 const tvn: ChannelConfig = { number: 5, name: 'TVN', epg_id: 'TVN' };

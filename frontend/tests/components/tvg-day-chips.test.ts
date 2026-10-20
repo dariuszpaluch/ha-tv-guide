@@ -1,6 +1,6 @@
 import { afterEach, expect, test, vi } from 'vitest';
-import './tvg-day-chips';
-import type { TvgDayChips } from './tvg-day-chips';
+import '../../src/components/tvg-day-chips';
+import type { TvgDayChips } from '../../src/components/tvg-day-chips';
 
 const mount = async (props: Partial<TvgDayChips> = {}) => {
   const el = document.createElement('tvg-day-chips') as TvgDayChips;

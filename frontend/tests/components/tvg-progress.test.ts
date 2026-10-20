@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
-import './tvg-progress';
-import { TvgProgress } from './tvg-progress';
+import '../../src/components/tvg-progress';
+import { TvgProgress } from '../../src/components/tvg-progress';
 
 test('bar width follows the value', async () => {
   const el = new TvgProgress();

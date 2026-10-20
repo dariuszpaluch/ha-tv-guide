@@ -1,9 +1,9 @@
 import { afterEach, expect, test, vi } from 'vitest';
-import type { ChannelConfig } from '../config';
-import { NOW, WAW, faktyTomorrow, sport, tEn, zycie } from '../test/fixtures';
-import { TvgProgrammeRow } from './tvg-programme-row';
+import type { ChannelConfig } from '../../src/config';
+import { NOW, WAW, faktyTomorrow, sport, tEn, zycie } from '../fixtures';
+import { TvgProgrammeRow } from '../../src/components/tvg-programme-row';
 
-vi.mock('../utils/logo-tone', () => ({ measureLogo: vi.fn(() => 'mixed') }));
+vi.mock('../../src/utils/logo-tone', () => ({ measureLogo: vi.fn(() => 'mixed') }));
 
 const polsat: ChannelConfig = { number: 3, name: 'Polsat', epg_id: 'Polsat' };
 

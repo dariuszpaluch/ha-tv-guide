@@ -1,6 +1,6 @@
 import type { ReactiveControllerHost } from 'lit';
 import { afterEach, expect, test, vi } from 'vitest';
-import { SwipeController } from './swipe-controller';
+import { SwipeController } from '../../src/controllers/swipe-controller';
 
 const WIDTH = 300;
 const HEIGHT = 500;

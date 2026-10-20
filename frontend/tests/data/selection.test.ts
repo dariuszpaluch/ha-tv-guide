@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
-import type { ChannelConfig } from '../config';
-import { notSelected } from './selection';
+import type { ChannelConfig } from '../../src/config';
+import { notSelected } from '../../src/data/selection';
 
 const tvn: ChannelConfig = { number: 5, name: 'TVN', epg_id: 'TVN' };
 const tvp: ChannelConfig = { number: 1, name: 'TVP 1 HD', epg_id: 'TVP 1' };

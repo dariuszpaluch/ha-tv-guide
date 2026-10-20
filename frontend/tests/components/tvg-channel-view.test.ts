@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
-import type { ChannelConfig } from '../config';
-import { NOW, WAW, fakty, faktyTomorrow, nocneKino, poKinie, sport, tEn, uwagaTomorrow } from '../test/fixtures';
-import type { Programme } from '../types/api';
-import './tvg-channel-view';
-import { viewStyles } from './view-parts';
-import type { TvgChannelView } from './tvg-channel-view';
+import type { ChannelConfig } from '../../src/config';
+import { NOW, WAW, fakty, faktyTomorrow, nocneKino, poKinie, sport, tEn, uwagaTomorrow } from '../fixtures';
+import type { Programme } from '../../src/types/api';
+import '../../src/components/tvg-channel-view';
+import { viewStyles } from '../../src/components/view-parts';
+import type { TvgChannelView } from '../../src/components/tvg-channel-view';
 
-vi.mock('../utils/logo-tone', () => ({ measureLogo: vi.fn(() => 'mixed') }));
+vi.mock('../../src/utils/logo-tone', () => ({ measureLogo: vi.fn(() => 'mixed') }));
 
 const tvn: ChannelConfig = { number: 5, name: 'TVN', epg_id: 'TVN' };
 

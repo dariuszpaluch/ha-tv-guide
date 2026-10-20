@@ -10,7 +10,7 @@ import {
   tvDayRange,
   tvDays,
   whenText,
-} from './time';
+} from '../../src/data/time';
 import {
   NOW,
   WAW,
@@ -23,8 +23,8 @@ import {
   tEn,
   tPl,
   uwagaTomorrow,
-} from '../test/fixtures';
-import type { HomeAssistant } from '../types/hass';
+} from '../fixtures';
+import type { HomeAssistant } from '../../src/types/hass';
 
 const HOUR = 3600e3;
 

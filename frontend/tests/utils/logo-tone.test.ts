@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { logoTone } from './logo-tone';
+import { logoTone } from '../../src/utils/logo-tone';
 
 const SIZE = 48;
 const TOTAL = SIZE * SIZE;

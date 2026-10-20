@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
-import { GuideClient, GuideError } from './guide-client';
-import { channels, fakty, NOW } from '../test/fixtures';
+import { GuideClient, GuideError } from '../../src/data/guide-client';
+import { channels, fakty, NOW } from '../fixtures';
 
 type Message = Record<string, unknown>;
 

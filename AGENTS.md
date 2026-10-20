@@ -41,7 +41,7 @@ Read before you change anything:
 You do not need a running Home Assistant.
 
 - The integration tests use the `hass` fixture of `pytest-homeassistant-custom-component`. The shared test data is in `tests/conftest.py` and `tests/fixtures/`.
-- The card tests use Vitest with happy-dom. The shared guide data is in `frontend/src/test/fixtures.ts`. `frontend/src/tv-guide.test.ts` builds a fake `hass` object with a fake server (`makeHass`).
+- The card tests use Vitest with happy-dom. The tests are in `frontend/tests/`, in the same folders as the code in `frontend/src/`. The shared guide data is in `frontend/tests/fixtures.ts`. `frontend/tests/tv-guide.test.ts` builds a fake `hass` object with a fake server (`makeHass`).
 - The test clock is 2026-10-19 19:20 in `Europe/Warsaw`.
 
 ## Where to start

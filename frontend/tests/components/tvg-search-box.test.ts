@@ -1,6 +1,6 @@
 import { afterEach, expect, test, vi } from 'vitest';
-import { tEn } from '../test/fixtures';
-import { TvgSearchBox } from './tvg-search-box';
+import { tEn } from '../fixtures';
+import { TvgSearchBox } from '../../src/components/tvg-search-box';
 
 const mount = async (value = '') => {
   const el = new TvgSearchBox();
