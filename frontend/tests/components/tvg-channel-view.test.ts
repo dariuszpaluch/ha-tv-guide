@@ -198,7 +198,7 @@ describe('programmes across the TV-day start', () => {
   });
 });
 
-test('a programme with a reminder has a small bell next to its time', async () => {
+test('a programme with a reminder has a small bell under its time', async () => {
   const info = earlier('TVN|2026-10-19T17:50:00Z', '2026-10-19T19:50:00+02:00', '2026-10-19T20:00:00+02:00');
   const el = await mount({ programmes: [fakty, sport, info], remindedIds: new Set([info.id]) });
   const [faktySlot, sportSlot, infoSlot] = $$(el, '.slot');
