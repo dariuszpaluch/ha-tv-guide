@@ -1,0 +1,25 @@
+name: Validate
+
+on:
+  push:
+  pull_request:
+  # HACS and hassfest rules change with new releases, so check once a week also without a push.
+  schedule:
+    - cron: "0 4 * * 1"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  hassfest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: home-assistant/actions/hassfest@master
+
+  hacs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: hacs/action@main
+        with:
+          category: integration
