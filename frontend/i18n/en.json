@@ -39,5 +39,10 @@
   "loadFailed": "Cannot load the guide. Trying again soon.",
   "cardDescription": "TV guide: what is on now, the schedule, search and channel switching.",
   "staleGuide": "Guide from {date_time}",
-  "switchFailed": "Cannot switch to {channel_name}: {error}"
+  "switchFailed": "Cannot switch to {channel_name}: {error}",
+  "remindMe": "Remind me 5 minutes before",
+  "reminderSet": "Reminder set",
+  "noPhone": "No phone with the Home Assistant app found for your user.",
+  "reminderFailed": "Cannot change the reminder: {error}",
+  "reminderTooLate": "The programme starts in less than 5 minutes."
 }

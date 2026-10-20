@@ -24,7 +24,7 @@ from .images import (
     ImageCache,
     TvGuideImageView,
 )
-from .store import GuideStore
+from .store import GuideStore, ReminderStore
 from .websocket_api import async_register_commands
 
 _LOGGER = logging.getLogger(__name__)
@@ -89,28 +89,39 @@ async def async_setup_entry(hass: HomeAssistant, entry: TvGuideConfigEntry) -> b
     download must work, otherwise Home Assistant retries the setup.
     """
     coordinator = TvGuideCoordinator(hass, entry)
+    # Registered before the load plans any timer: when the first download fails, Home Assistant
+    # runs the unload callbacks and retries, and the timers of this attempt must not stay alive.
+    # Unload callbacks run in reverse order, so the listener below goes first: after the timers
+    # are cancelled, a guide update must not plan new ones.
+    entry.async_on_unload(coordinator.reminders.unload)
+    await coordinator.reminders.async_load()
     if await coordinator.async_load_stored():
         entry.async_create_background_task(hass, coordinator.async_refresh(), "tv_guide refresh")
     else:
         await coordinator.async_config_entry_first_refresh()
     entry.runtime_data = coordinator
     # The guide has no entities. A coordinator only schedules its timer while it has a listener.
-    entry.async_on_unload(coordinator.async_add_listener(lambda: None))
+    # This listener keeps the timer alive and checks the reminders after each update.
+    entry.async_on_unload(coordinator.async_add_listener(coordinator.reminders.handle_guide_update))
+    # The first guide came before the listener existed, so match the loaded reminders with it now.
+    if coordinator.data is not None:
+        coordinator.reminders.handle_guide_update()
     return True
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: TvGuideConfigEntry) -> bool:
-    """Unload the entry. The coordinator needs no cleanup."""
+    """Unload the entry. The unload callbacks of the entry stop the listener and the reminder timers."""
     return True
 
 
 async def async_remove_entry(hass: HomeAssistant, entry: TvGuideConfigEntry) -> None:
-    """Delete the stored guide with the entry, and the posters with the last entry.
+    """Delete the stored guide and reminders with the entry, and the posters with the last entry.
 
     All entries share one poster folder. Its daily cleanup runs only while the
     integration is loaded, so without this the posters would stay on disk forever.
     """
     await GuideStore(hass, entry.entry_id).async_remove()
+    await ReminderStore(hass, entry.entry_id).async_remove()
     others = [other for other in hass.config_entries.async_entries(DOMAIN) if other.entry_id != entry.entry_id]
     if not others:
         folder = hass.config.path(IMAGE_FOLDER)

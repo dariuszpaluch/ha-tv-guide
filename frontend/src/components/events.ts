@@ -11,6 +11,7 @@ export interface TvgEventDetails {
   'tvg-back': Record<string, never>;
   'tvg-close': Record<string, never>;
   'tvg-show-earlier': Record<string, never>;
+  'tvg-reminder': { programmeId: string; on: boolean };
 }
 
 declare global {
@@ -24,6 +25,7 @@ declare global {
     'tvg-back': CustomEvent<TvgEventDetails['tvg-back']>;
     'tvg-close': CustomEvent<TvgEventDetails['tvg-close']>;
     'tvg-show-earlier': CustomEvent<TvgEventDetails['tvg-show-earlier']>;
+    'tvg-reminder': CustomEvent<TvgEventDetails['tvg-reminder']>;
   }
 }
 

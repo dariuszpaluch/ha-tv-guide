@@ -54,6 +54,35 @@ Times in output are ISO 8601 strings with the offset of the source. Times in inp
 
 `last_success`: time of the last good download. `update_interval`: hours.
 
+### Reminder
+
+```json
+{
+  "programme_id": "TVN|2026-10-19T18:00:00Z",
+  "channel_id": "TVN",
+  "title": "Fakty",
+  "start": "2026-10-19T20:00:00+02:00"
+}
+```
+
+| Field | Rule |
+| --- | --- |
+| `programme_id` | A programme `id`. |
+| `channel_id` | String. |
+| `title` | String. A copy from the time the reminder was set or last matched. |
+| `start` | ISO 8601 time with offset. |
+
+### Reminders
+
+```json
+{ "reminders": [Reminder], "phones": ["Pixel 8"] }
+```
+
+| Field | Rule |
+| --- | --- |
+| `reminders` | `Reminder[]` of the user of the connection, soonest first. |
+| `phones` | `string[]`: names of the user's phones that get the notification. Empty when the user has no phone with the Home Assistant app. |
+
 ## Title matching
 
 Used by `search` and `airings`. Normalized text = lower case, Unicode `NFKD` without non-spacing marks (Unicode category `Mn`), then the letters that `NFKD` does not split: `ł` -> `l`, `ß` -> `ss`, `ı` -> `i`, `ø` -> `o`, `đ` -> `d`, `æ` -> `ae`, `œ` -> `oe`; outer whitespace removed. The card uses the same rule for channel names.
@@ -69,6 +98,7 @@ Errors (`connection.send_error`):
 | `not_found` | There is no `tv_guide` entry, or no entry with this `entry_id`. |
 | `not_loaded` | The entry exists but is not loaded yet (for example, HA retries the setup because the first download failed and no stored guide exists). |
 | `invalid_format` | Bad input: HA schema validation, a time that cannot be parsed, or a query shorter than 2 characters after trimming. |
+| `too_late` | `tv_guide/reminders/add` for a programme that starts in 5 minutes or less, or has started. |
 
 ### `tv_guide/info`
 
@@ -109,6 +139,39 @@ Output: `Programme[]`.
 - Order: first the programme's channel, soonest first; then the other channels, soonest first.
 - A programme shorter than 15 minutes has no airings: empty list. Short programmes (weather, news flashes) have generic titles like "Pogoda" that match unrelated programmes on other channels.
 - Unknown `programme_id` (for example, the guide was refreshed): empty list.
+
+## Reminders
+
+A reminder notifies the phones of the user who set it, 5 minutes before the programme starts. The user always comes from the WebSocket connection, never from the input. Each reminder command answers with the full `Reminders` of that user.
+
+### `tv_guide/reminders/list`
+
+Input: none. Output: `Reminders`.
+
+### `tv_guide/reminders/add`
+
+Input: `programme_id: string`, `language: string` (the language of the user's HA profile; the notification is in Polish for `pl` and `pl-*`, else in English).
+Output: `Reminders` after the change.
+
+- Adding the same programme again is not an error.
+- Unknown `programme_id`: `not_found`.
+- The programme starts in 5 minutes or less, or has started: `too_late`.
+
+### `tv_guide/reminders/remove`
+
+Input: `programme_id: string`.
+Output: `Reminders` after the change. Removing a missing reminder is not an error.
+
+### Event `tv_guide_reminder`
+
+Fired on the HA event bus for each notification, also when the user has no phone. Use it in your own automations.
+
+| Field | Rule |
+| --- | --- |
+| `kind` | `starting`: the programme starts in 5 minutes. `gone`: the programme is no longer in the guide, and the reminder is deleted. |
+| `user_id` | The HA user who set the reminder. |
+| `programme_id`, `channel_id`, `title`, `start` | As in `Reminder`. |
+| `channel_name` | The channel name, or `channel_id` when the guide does not know the channel. |
 
 ## HTTP
 

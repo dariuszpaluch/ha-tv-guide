@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.2.0 - 2026-10-20
+
+### Card
+
+- Set or remove a reminder with the bell in programme details. A bell under the time marks it in the channel schedule.
+- Shows a warning when no phone is found for your HA user.
+
+### Integration
+
+- Sends a notification to your Companion app phones 5 minutes before the programme starts.
+- Stores reminders per user and restores their timers after a restart.
+- Follows moved programmes and sends one notice when a programme leaves the guide.
+- Fires `tv_guide_reminder` for your automations, also when no phone is found.
+
+## 0.1.1 - 2026-10-20
+
+### Card
+
+- The card loads every time. Before, it showed as an error in about 2 of 3 page loads: Home Assistant replaces the browser's list of custom elements when its app starts, and the card was sometimes defined before that. The card now waits for the app.
+
 ## 0.1.0 - 2026-10-20
 
 First release.

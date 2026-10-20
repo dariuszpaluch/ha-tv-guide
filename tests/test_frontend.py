@@ -1,5 +1,6 @@
 """The integration serves the built card and tells the HA frontend to load it."""
 
+import json
 import logging
 from pathlib import Path
 
@@ -13,7 +14,8 @@ import custom_components.tv_guide as tv_guide
 from custom_components.tv_guide.const import DOMAIN
 
 CARD_PATH = "/tv_guide_frontend/tv-guide.js"
-CARD_URL = f"{CARD_PATH}?v=0.1.0"
+VERSION = json.loads((Path(tv_guide.__file__).parent / "manifest.json").read_text())["version"]
+CARD_URL = f"{CARD_PATH}?v={VERSION}"
 
 
 @pytest.fixture

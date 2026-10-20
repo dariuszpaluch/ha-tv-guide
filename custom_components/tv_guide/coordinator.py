@@ -17,8 +17,9 @@ from homeassistant.util import dt as dt_util
 from .const import DOMAIN
 from .model import Guide
 from .parser import ParseError, parse_guide
+from .reminders import ReminderManager
 from .source import SourceError, fetch_source, open_source
-from .store import GuideStore
+from .store import GuideStore, ReminderStore
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -49,6 +50,8 @@ class TvGuideCoordinator(DataUpdateCoordinator[Guide]):
             update_interval=timedelta(hours=entry.options["update_interval"]),
         )
         self._store = GuideStore(hass, entry.entry_id)
+        # `self.data` is None until the first guide loads: the manager accepts that.
+        self.reminders = ReminderManager(hass, entry, ReminderStore(hass, entry.entry_id), lambda: self.data)
         self._last_success: datetime | None = None
 
     @property

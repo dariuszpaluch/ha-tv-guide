@@ -1,4 +1,4 @@
-import type { Channel, GuideErrorCode, GuideInfo, NowMap, Programme, SearchWhen } from '../types/api';
+import type { Channel, GuideErrorCode, GuideInfo, NowMap, Programme, Reminders, SearchWhen } from '../types/api';
 import type { HomeAssistant } from '../types/hass';
 
 type Connection = Pick<HomeAssistant['connection'], 'sendMessagePromise'>;
@@ -11,7 +11,7 @@ interface CacheEntry<T> {
 const SECOND = 1000;
 const NOW_TTL = 60 * SECOND;
 const LONG_TTL = 10 * 60 * SECOND;
-const KNOWN_CODES: readonly GuideErrorCode[] = ['not_found', 'not_loaded', 'invalid_format'];
+const KNOWN_CODES: readonly GuideErrorCode[] = ['not_found', 'not_loaded', 'invalid_format', 'too_late'];
 
 /** An error from the integration. `code` is a contract error code, or `unknown` for anything else. */
 export class GuideError extends Error {
@@ -105,6 +105,22 @@ export class GuideClient {
     );
   }
 
+  /** The user's reminders and notification phones. Never cached. */
+  reminders(): Promise<Reminders> {
+    return this.send<Reminders>('tv_guide/reminders/list');
+  }
+
+  /** Adds a reminder with the user's HA profile language. Never cached. */
+  addReminder(programmeId: string, language: string): Promise<Reminders> {
+    return this.send<Reminders>('tv_guide/reminders/add', { programme_id: programmeId, language });
+  }
+
+  /** Removes a reminder and returns the updated list. Never cached. */
+  removeReminder(programmeId: string): Promise<Reminders> {
+    return this.send<Reminders>('tv_guide/reminders/remove', { programme_id: programmeId });
+  }
+
+  /** Sends a contract command with the optional entry id and normalizes server errors. */
   private send<T>(type: string, fields: Record<string, unknown> = {}): Promise<T> {
     const message = { type, ...fields, ...(this.entryId === undefined ? {} : { entry_id: this.entryId }) };
     return this.connection.sendMessagePromise<T>(message).catch((error: unknown) => {

@@ -51,9 +51,11 @@ The two parts meet only at [api.md](api.md). The card has its own copy of the co
 | `source.py` | Downloads the source (64 MB limit) and opens it as a stream: plain, `.gz`, `.xz` or `.zip`. |
 | `parser.py` | Streaming XMLTV parser. Keeps only the selected channels. |
 | `model.py` | `Channel`, `Programme` and `Guide`, and their JSON shapes from the contract. |
-| `store.py` | Saves and loads the last good guide with HA `Store`. |
+| `store.py` | Saves and loads the last good guide and a separate reminder file with HA `Store`. |
 | `coordinator.py` | Downloads the guide on a timer, keeps the last good one, falls back to the stored copy. |
 | `search.py` | Queries: on now, schedule, search, more airings, title matching. |
+| `reminders.py` | Stores reminders per user, matches them after guide updates and sets their timers. |
+| `delivery.py` | Finds the user's phones, sends translated notifications and fires the reminder event. |
 | `websocket_api.py` | The `tv_guide/*` commands from the contract. |
 | `images.py` | Poster view and poster cache. |
 | `diagnostics.py` | The diagnostics file for bug reports. It names only the server of the guide URL. |
@@ -88,10 +90,29 @@ The two parts meet only at [api.md](api.md). The card has its own copy of the co
 - When the source fails and there is no copy on disk, the view answers `404` and the card shows a placeholder icon.
 - The poster URL needs no HA login, because an `<img>` tag cannot send a token. The view serves only ids of posters in a loaded guide, and the ids are hashes that cannot be guessed.
 
+## Reminders
+
+Each config entry has a `ReminderManager`. Each reminder belongs to the HA user who set it. The user comes from the WebSocket connection. One user can set one reminder per programme. Removing it does not remove another user's reminder for the same programme.
+
+Reminders have their own HA `Store` at `<config>/.storage/tv_guide.<entry_id>.reminders`. This keeps frequent reminder writes separate from the large guide file. Each record keeps the user, programme id, channel id, title, start and language. Removing the config entry deletes this file too.
+
+The manager sets one HA timer per reminder, exactly 5 minutes before the start. There is no lead time setting. It plans all timers again after a change or a restart. If the reminder is due but the programme has not started, it fires at once. If the programme has started, the reminder is deleted without a notice. The manager removes and saves a reminder before delivery, so a restart cannot send it twice. Unloading the entry cancels the timers.
+
+After a guide update, the manager first looks for the programme id. If it is missing, it looks on the same channel for the same normalized title within 3 hours before or after the old start. The closest start wins. A match updates the reminder and its timer. Without a match, the manager sends one "no longer in the guide" notice and deletes the reminder. It does this only if a programme of the channel is on air at the old start. Without one (the channel is deselected, or the source has a gap), it keeps the reminder and its stored start. A failed download does not change reminders.
+
+Delivery finds `mobile_app` config entries whose `user_id` matches the reminder. It builds each notify service name with `slugify("mobile_app_" + device_name)` and keeps only services that exist. No notify service needs to be set in the card. This uses internal Companion app data, so changes in HA may need changes here. A failed notify call is logged and does not stop delivery to the other phones.
+
+The notification uses the HA profile language sent by the card when the reminder was set. Polish, including `pl-PL`, gets Polish text. Other languages get English. Notification times use the HA server's time zone and a 24-hour clock. The notification tag is `tv_guide_<programme_id>`.
+
+After the phone calls, delivery fires `tv_guide_reminder` on the HA event bus. It also fires when no phone is found. Its `kind` is `starting` or `gone`. It carries `user_id`, `programme_id`, `channel_id`, `channel_name`, `title` and `start`. The channel name falls back to the channel id when the guide does not know it. See [api.md](api.md#event-tv_guide_reminder) for the fields.
+
+The card shows a bell in programme details only when the start is more than 5 minutes away. Tap it to add or remove your reminder. A small bell under the time marks the programme in the channel schedule. If no phone is found, programme details show a warning when the reminder is set. The card refreshes reminders every 60 seconds. A reminder request that fails does not stop the guide from loading.
+
 ## Card
 
 | Folder | What is in it |
 | --- | --- |
+| `loader.ts` | Entry of the built file. It waits until HA defines `home-assistant`, then loads the card. HA replaces `window.customElements` with a polyfill when its app starts, and elements defined before that are lost. |
 | `tv-guide.ts` | The root card: config, refresh every 60 seconds, list, search and the sheet. |
 | `components/` | Lit elements: rows, day chips, the sheet and its two views, the search box. |
 | `controllers/` | The swipe controller for the sheet gestures. |
@@ -124,10 +145,6 @@ The two parts meet only at [api.md](api.md). The card has its own copy of the co
 
 ## Ideas for later
 
-**Reminders.** A bell on a programme. HA sends a notification shortly before it starts.
-
-- Card: a bell in the programme view. It calls new commands `tv_guide/reminders/add` and `tv_guide/reminders/remove` with the programme `id`.
-- Integration: stores reminders on disk per HA user, sets a timer (5 minutes before the start by default) and restores the timers after a restart.
-- Delivery: a notify service from the config (for example `notify.mobile_app_<phone>`) and an event `tv_guide_reminder` for your own automations.
-- Moved programmes: after each guide refresh, find the same programme (same channel and title, near the old start) and move the timer. If it is gone, send a notice.
-- Later still: a "Switch" button in the notification (the switch action must then move from the card config to the integration), a poster in the notification (needs an external URL), and a list of reminders in the card.
+- A "Switch" button in the notification. The switch action must then move from the card config to the integration.
+- A poster in the notification. It needs an external URL.
+- A list of all reminders in the card.

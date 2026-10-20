@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { validateConfig } from '../src/config';
 import { tvDayRange } from '../src/data/time';
 import { NOW, WAW, channels, fakty, faktyDay3, faktyPolsat, faktyTomorrow, mecz, sport, uwagaTomorrow, zycie } from './fixtures';
-import type { Channel, Programme } from '../src/types/api';
+import type { Channel, Programme, Reminder, Reminders } from '../src/types/api';
 import type { HomeAssistant } from '../src/types/hass';
 import '../src/tv-guide';
 import { registerCard, TvGuide } from '../src/tv-guide';
@@ -42,7 +42,10 @@ const makeServer = () => {
     search: { now: [fakty] as Programme[], later: [faktyPolsat] as Programme[] },
     airings: [] as Programme[],
     airingsBy: {} as Record<string, Programme[]>,
+    reminders: [] as Reminder[],
+    phones: ['Pixel 8'],
     now: { Polsat: zycie, TVN: fakty } as Record<string, Programme | null>,
+    remindersAnswer: (): Reminders => ({ reminders: [...server.reminders], phones: server.phones }),
     send: vi.fn(async (message: Record<string, unknown>): Promise<unknown> => {
       if (server.fail && (server.failType === undefined || server.failType === message.type)) throw server.fail;
       if (server.hold.has(message.type as string)) {
@@ -67,6 +70,18 @@ const makeServer = () => {
           return message.when === 'now' ? server.search.now : server.search.later;
         case 'tv_guide/airings':
           return server.airingsBy[message.programme_id as string] ?? server.airings;
+        case 'tv_guide/reminders/list':
+          return server.remindersAnswer();
+        case 'tv_guide/reminders/add': {
+          const added = SCHEDULE.find((p) => p.id === message.programme_id);
+          if (added) {
+            server.reminders.push({ programme_id: added.id, channel_id: added.channel_id, title: added.title, start: added.start });
+          }
+          return server.remindersAnswer();
+        }
+        case 'tv_guide/reminders/remove':
+          server.reminders = server.reminders.filter((reminder) => reminder.programme_id !== message.programme_id);
+          return server.remindersAnswer();
         default:
           throw new Error(`unexpected message ${String(message.type)}`);
       }
@@ -656,4 +671,105 @@ test('getStubConfig gives a valid config for the card picker', () => {
   expect(() => validateConfig(stub)).not.toThrow();
   expect(stub.sections).toHaveLength(1);
   expect(stub.sections[0]?.channels).toHaveLength(1);
+});
+
+// ---- reminders ----
+
+/** Opens the channel of TVN and then the programme view of Sport, which starts in 15 minutes. */
+const openSport = async (el: TvGuide) => {
+  $<HTMLElement>(rowOf(el, 5)?.shadowRoot, '.info')?.click();
+  await settle(el);
+  const slots = $$<HTMLElement>($(el.shadowRoot, 'tvg-channel-view')?.shadowRoot, '.slot');
+  slots.find((slot) => slot.textContent?.includes('Sport'))?.click();
+  await settle(el);
+};
+
+const bell = (el: TvGuide) => $<HTMLElement>($(el.shadowRoot, 'tvg-programme-view')?.shadowRoot, '[data-reminder]');
+
+test('refresh loads the reminders and the channel view shows the bell', async () => {
+  const setup = makeHass();
+  setup.server.reminders = [{ programme_id: sport.id, channel_id: 'TVN', title: 'Sport', start: sport.start }];
+  const { el, server } = await mount(setup);
+  expect(server.requests('tv_guide/reminders/list')).toHaveLength(1);
+
+  $<HTMLElement>(rowOf(el, 5)?.shadowRoot, '.info')?.click();
+  await settle(el);
+  const view = $<HTMLElement & { remindedIds: ReadonlySet<string> }>(el.shadowRoot, 'tvg-channel-view');
+  expect([...(view?.remindedIds ?? [])]).toEqual([sport.id]);
+  expect($$(view?.shadowRoot, '.rem')).toHaveLength(1);
+});
+
+test('a tap on the bell adds the reminder with the HA profile language', async () => {
+  const { el, server } = await mount(makeHass(makeServer(), { language: 'pl' }));
+  await openSport(el);
+  expect(bell(el)?.getAttribute('aria-pressed')).toBe('false');
+
+  bell(el)?.click();
+  await settle(el);
+  expect(server.requests('tv_guide/reminders/add')).toEqual([
+    { type: 'tv_guide/reminders/add', entry_id: undefined, programme_id: sport.id, language: 'pl' },
+  ]);
+  expect(bell(el)?.getAttribute('aria-pressed')).toBe('true');
+});
+
+test('a second tap removes it', async () => {
+  const { el, server } = await mount();
+  await openSport(el);
+  bell(el)?.click();
+  await settle(el);
+  bell(el)?.click();
+  await settle(el);
+  expect(server.requests('tv_guide/reminders/remove')).toHaveLength(1);
+  expect(server.reminders).toEqual([]);
+  expect(bell(el)?.getAttribute('aria-pressed')).toBe('false');
+});
+
+test('a failed add shows one hass-notification', async () => {
+  const { el, server } = await mount();
+  await openSport(el);
+  const onNotification = vi.fn();
+  el.addEventListener('hass-notification', (event) => onNotification((event as CustomEvent).detail));
+  server.fail = { code: 'too_late', message: 'Too late' };
+  server.failType = 'tv_guide/reminders/add';
+
+  bell(el)?.click();
+  await settle(el);
+  expect(onNotification).toHaveBeenCalledTimes(1);
+  expect(onNotification).toHaveBeenCalledWith({ message: 'The programme starts in less than 5 minutes.' });
+  expect(bell(el)?.getAttribute('aria-pressed')).toBe('false');
+});
+
+test('another failed add keeps the generic reminder error', async () => {
+  const { el, server } = await mount();
+  await openSport(el);
+  const onNotification = vi.fn();
+  el.addEventListener('hass-notification', (event) => onNotification((event as CustomEvent).detail));
+  server.fail = { code: 'not_loaded', message: 'Guide not loaded' };
+  server.failType = 'tv_guide/reminders/add';
+
+  bell(el)?.click();
+  await settle(el);
+  expect(onNotification).toHaveBeenCalledTimes(1);
+  expect(onNotification).toHaveBeenCalledWith({ message: 'Cannot change the reminder: Guide not loaded' });
+});
+
+test('a reminders failure does not break the guide', async () => {
+  const setup = makeHass();
+  setup.server.fail = { code: 'not_loaded', message: 'Guide not loaded' };
+  setup.server.failType = 'tv_guide/reminders/list';
+  const { el } = await mount(setup);
+  expect(rows(el)).toHaveLength(3);
+  expect($(el.shadowRoot, '.empty')).toBeNull();
+});
+
+test('the no-phone warning shows when phones is empty', async () => {
+  const setup = makeHass();
+  setup.server.phones = [];
+  const { el } = await mount(setup);
+  await openSport(el);
+  expect($($(el.shadowRoot, 'tvg-programme-view')?.shadowRoot, '.warn')).toBeNull();
+
+  bell(el)?.click();
+  await settle(el);
+  expect($($(el.shadowRoot, 'tvg-programme-view')?.shadowRoot, '.warn')?.textContent).toContain('No phone');
 });

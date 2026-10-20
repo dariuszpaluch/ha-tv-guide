@@ -4,7 +4,7 @@ from typing import Any
 
 import pytest
 from homeassistant.config_entries import ConfigEntryDisabler, ConfigEntryState
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant_custom_component.common import MockConfigEntry, async_mock_service
 from pytest_homeassistant_custom_component.typing import MockHAClientWebSocket
 
 from custom_components.tv_guide.const import DOMAIN
@@ -157,3 +157,87 @@ async def test_not_loaded_while_setup_retry(hass, ws, aioclient_mock, mock_entry
     assert mock_entry.state is ConfigEntryState.SETUP_RETRY
     msg = await call(ws, "info")
     assert msg["error"]["code"] == "not_loaded"
+
+
+INFO_ID = "TVN|2026-10-19T17:50:00Z"
+INFO_REMINDER = {
+    "programme_id": INFO_ID,
+    "channel_id": "TVN",
+    "title": "Info",
+    "start": "2026-10-19T19:50:00+02:00",
+}
+
+
+async def test_reminders_add_list_remove(ws, loaded_entry) -> None:
+    msg = await call(ws, "reminders/add", programme_id=INFO_ID, language="en")
+    assert msg["result"] == {"reminders": [INFO_REMINDER], "phones": []}
+
+    assert (await call(ws, "reminders/list"))["result"] == msg["result"]
+
+    msg = await call(ws, "reminders/remove", programme_id=INFO_ID)
+    assert msg["result"] == {"reminders": [], "phones": []}
+
+
+async def test_reminders_are_soonest_first(ws, loaded_entry) -> None:
+    tomorrow = "TVN|2026-10-20T17:50:00Z"
+    await call(ws, "reminders/add", programme_id=tomorrow, language="en")
+    await call(ws, "reminders/add", programme_id=INFO_ID, language="en")
+    msg = await call(ws, "reminders/list")
+    assert [r["programme_id"] for r in msg["result"]["reminders"]] == [INFO_ID, tomorrow]
+
+
+async def test_reminders_add_twice_is_not_an_error(ws, loaded_entry) -> None:
+    await call(ws, "reminders/add", programme_id=INFO_ID, language="en")
+    msg = await call(ws, "reminders/add", programme_id=INFO_ID, language="en")
+    assert msg["result"]["reminders"] == [INFO_REMINDER]
+
+
+async def test_reminders_remove_missing_is_not_an_error(ws, loaded_entry) -> None:
+    msg = await call(ws, "reminders/remove", programme_id=INFO_ID)
+    assert msg["result"] == {"reminders": [], "phones": []}
+
+
+async def test_reminders_add_unknown_programme(ws, loaded_entry) -> None:
+    msg = await call(ws, "reminders/add", programme_id="TVN|2030-01-01T00:00:00Z", language="en")
+    assert msg["error"]["code"] == "not_found"
+
+
+async def test_reminders_add_without_a_guide(ws, loaded_entry) -> None:
+    loaded_entry.runtime_data.data = None
+    msg = await call(ws, "reminders/add", programme_id=INFO_ID, language="en")
+    assert msg["error"]["code"] == "not_found"
+
+
+async def test_reminders_add_too_late(ws, loaded_entry) -> None:
+    # Fakty is on now
+    msg = await call(ws, "reminders/add", programme_id="TVN|2026-10-19T17:00:00Z", language="en")
+    assert msg["error"]["code"] == "too_late"
+
+
+async def test_reminders_add_needs_a_language(ws, loaded_entry) -> None:
+    msg = await call(ws, "reminders/add", programme_id=INFO_ID)
+    assert msg["error"]["code"] == "invalid_format"
+
+
+async def test_reminders_are_per_user(
+    hass, ws, loaded_entry, hass_ws_client, hass_read_only_access_token, hass_admin_user
+) -> None:
+    await call(ws, "reminders/add", programme_id=INFO_ID, language="en")
+    other = await hass_ws_client(hass, hass_read_only_access_token)
+
+    assert (await call(other, "reminders/list"))["result"]["reminders"] == []
+
+    # The other user sets the same reminder, then removes it: the first user keeps theirs.
+    await call(other, "reminders/add", programme_id=INFO_ID, language="pl")
+    assert (await call(other, "reminders/remove", programme_id=INFO_ID))["result"]["reminders"] == []
+    assert (await call(ws, "reminders/list"))["result"]["reminders"] == [INFO_REMINDER]
+
+
+async def test_reminders_list_shows_the_phones(ws, loaded_entry, hass, hass_admin_user) -> None:
+    MockConfigEntry(
+        domain="mobile_app", data={"user_id": hass_admin_user.id, "device_name": "Pixel 8", "webhook_id": "hook"}
+    ).add_to_hass(hass)
+    async_mock_service(hass, "notify", "mobile_app_pixel_8")
+
+    msg = await call(ws, "reminders/list")
+    assert msg["result"] == {"reminders": [], "phones": ["Pixel 8"]}

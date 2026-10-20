@@ -51,5 +51,16 @@
     "abort": {
       "not_loaded": "Przewodnik nie jest jeszcze wczytany. Spróbuj, gdy integracja działa."
     }
+  },
+  "exceptions": {
+    "reminder_starting_title": {
+      "message": "{channel_name} · {time}"
+    },
+    "reminder_starting_message": {
+      "message": "{title} zaczyna się za 5 minut"
+    },
+    "reminder_gone_message": {
+      "message": "{title} nie ma już w programie"
+    }
   }
 }
