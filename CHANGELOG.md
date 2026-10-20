@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.3.0 - 2026-10-20
+
+### Card
+
+- The channel list shows what comes next on each channel, with its start time.
+- A TV with antenna waves shows in the middle of the list and the schedule while they load.
+- Search waits 250 ms after the last letter before it asks the server, so fast typing sends one search, not one per letter.
+
+### Integration
+
+- New command `tv_guide/next`: the first programme after now on each channel.
+
 ## 0.2.0 - 2026-10-20
 
 ### Card
