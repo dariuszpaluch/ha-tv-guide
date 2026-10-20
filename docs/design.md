@@ -15,9 +15,9 @@ XMLTV source (e.g. epg.ovh/pl.gz)
    │  HA server: download every N hours, keep selected channels, store a copy on disk
    ▼
 tv_guide integration ── guide in memory
-   │ ▲                          │
-   │ │ WebSocket (hass.callWS)  │ HTTP /api/tv_guide/image/<id>/<size>
-   ▼ │                          ▼
+   │ ▲                             │
+   │ │ WebSocket (hass.connection) │ HTTP /api/tv_guide/image/<id>/<size>
+   ▼ │                             ▼
 tv-guide card in the HA app or browser ◀── posters, resized and cached on disk
    │  tap on the left area / "Switch to N"
    ▼
