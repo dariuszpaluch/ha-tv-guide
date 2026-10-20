@@ -173,6 +173,11 @@ class ReminderManager:
         self._reminders = await self._store.async_load()
         await self._async_plan_timers()
 
+    @property
+    def count(self) -> int:
+        """How many reminders all users have. For diagnostics."""
+        return len(self._reminders)
+
     def for_user(self, user_id: str) -> list[Reminder]:
         """The reminders of one user, the soonest first."""
         return sorted((r for r in self._reminders if r.user_id == user_id), key=lambda r: r.start)

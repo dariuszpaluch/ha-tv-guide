@@ -51,7 +51,22 @@ async def test_diagnostics(
             "first_start": "2026-10-19T19:00:00+02:00",
             "last_stop": "2026-10-25T03:00:00+01:00",
         },
+        "reminders": 0,
     }
+
+
+async def test_diagnostics_counts_reminders_and_hides_who_set_them(
+    clock_at_now, hass: HomeAssistant, hass_client, loaded_entry, guide
+) -> None:
+    programme = guide.find("TVN|2026-10-19T17:50:00Z")
+    assert programme
+    await loaded_entry.runtime_data.reminders.async_add("secret-user-id", programme, "en")
+
+    result = await get_diagnostics_for_config_entry(hass, hass_client, loaded_entry)
+
+    assert result["reminders"] == 1
+    assert "secret-user-id" not in str(result)
+    assert programme.title not in str(result)
 
 
 async def test_diagnostics_after_a_failed_download(

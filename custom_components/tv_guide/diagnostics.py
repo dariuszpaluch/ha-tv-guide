@@ -22,6 +22,8 @@ async def async_get_config_entry_diagnostics(hass: HomeAssistant, entry: TvGuide
         "last_error": f"{type(last_error).__name__}: {last_error}" if last_error else None,
         "last_success": last_success.isoformat() if last_success else None,
         "guide": _guide_summary(coordinator.data, entry.options["channels"]) if coordinator.data else None,
+        # Only the number: user ids and titles are private.
+        "reminders": coordinator.reminders.count,
     }
 
 
