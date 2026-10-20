@@ -92,6 +92,7 @@ The two parts meet only at [api.md](api.md). The card has its own copy of the co
 
 | Folder | What is in it |
 | --- | --- |
+| `loader.ts` | Entry of the built file. It waits until HA defines `home-assistant`, then loads the card. HA replaces `window.customElements` with a polyfill when its app starts, and elements defined before that are lost. |
 | `tv-guide.ts` | The root card: config, refresh every 60 seconds, list, search and the sheet. |
 | `components/` | Lit elements: rows, day chips, the sheet and its two views, the search box. |
 | `controllers/` | The swipe controller for the sheet gestures. |
