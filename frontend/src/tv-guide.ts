@@ -39,10 +39,9 @@ const DAY_MS = 24 * 3600e3;
 const GUIDE_HORIZON_DAYS = 14;
 const PROGRAMME_SEARCH_MIN = 2;
 
-/** Everything the open details sheet shows. The sheet keeps its content while it slides away. */
-interface Details {
+/** One screen of the details sheet: what back returns to. */
+interface Screen {
   channel: ChannelConfig;
-  open: boolean;
   /** Selected TV day, `YYYY-MM-DD`. */
   day: string;
   /** Days with programmes, from today on. */
@@ -57,6 +56,16 @@ interface Details {
   /** `null` while they load. */
   airings: Programme[] | null;
 }
+
+/** Everything the open details sheet shows. The sheet keeps its content while it slides away. */
+interface Details extends Screen {
+  open: boolean;
+  /** Earlier screens, newest last. Back returns to the last one, like back in a browser; with none it closes the sheet. */
+  history: Screen[];
+}
+
+/** The screen part of the sheet state, without the open flag and the history. */
+const screenOf = ({ open, history, ...screen }: Details): Screen => screen;
 
 type LoadError = GuideErrorCode | 'unknown';
 
@@ -429,18 +438,20 @@ export class TvGuide extends LitElement {
     if (!channel || !programme || startHour === undefined) return;
     const zone = this.timeZone();
     const { details } = this;
+    // Inside the open sheet the current screen goes to the history. From search the sheet starts a new history.
+    const history = details?.open ? [...details.history, screenOf(details)] : [];
     const loaded = details?.open && details.channel === channel && details.programmes.some((p) => p.id === programme.id);
     if (loaded) {
       // A programme that crosses the day start is on both days: stay on the selected day when it is on it.
       const day = overlapsDay(programme, details.day, zone, startHour)
         ? details.day
         : tvDayKey(Date.parse(programme.start), zone, startHour);
-      this.showProgramme(programme, day);
+      this.showProgramme(programme, day, history);
       return;
     }
     // A programme that began before today's start and still runs belongs to today.
     const day = tvDayKey(Date.parse(programme.start), zone, startHour);
-    this.openChannel(channel, day < this.todayKey() ? this.todayKey() : day, programme);
+    this.openChannel(channel, day < this.todayKey() ? this.todayKey() : day, programme, history);
   };
 
   /** A tap on a day chip. All days are loaded already, so this makes no request. */
@@ -451,9 +462,27 @@ export class TvGuide extends LitElement {
     if (this.details.error) void this.loadSchedule();
   };
 
-  /** The programme view was closed (arrow or swipe). */
+  /**
+   * Back (arrow or swipe on the programme view) shows the previous screen, like back in a browser.
+   * Without one the sheet closes, so the user is back where the sheet opened: the list or the search results.
+   */
   private readonly onBack = (): void => {
-    if (this.details) this.details = { ...this.details, showProgramme: false };
+    const { details } = this;
+    if (!details) return;
+    const previous = details.history.at(-1);
+    if (!previous) {
+      this.details = { ...details, open: false };
+      return;
+    }
+    // Answers that are still on their way belong to the screen that the user leaves.
+    this.scheduleRun++;
+    this.airingsRun++;
+    // Back to a schedule: the programme view keeps its content while it slides away, and the schedule
+    // keeps the programme the user leaves in focus, so the list stays where it was.
+    const screen = previous.showProgramme ? previous : { ...previous, programme: details.programme, airings: details.airings };
+    this.details = { ...screen, open: true, history: details.history.slice(0, -1) };
+    if (screen.loading || screen.error) void this.loadSchedule();
+    if (screen.showProgramme && screen.programme && screen.airings === null) void this.loadAirings(screen.programme);
   };
 
   /** The sheet was closed. It keeps its content while it slides away. */
@@ -464,8 +493,9 @@ export class TvGuide extends LitElement {
   /**
    * Opens the sheet on a channel and a TV day, and loads the schedule.
    * With `programme` the programme view opens on top.
+   * @param history Earlier screens: an airing on another channel opens here while the sheet is open.
    */
-  private openChannel(channel: ChannelConfig, day: string, programme?: Programme): void {
+  private openChannel(channel: ChannelConfig, day: string, programme?: Programme, history: Screen[] = []): void {
     this.nowMs = Date.now();
     this.details = {
       channel,
@@ -477,15 +507,16 @@ export class TvGuide extends LitElement {
       programme,
       showProgramme: programme !== undefined,
       airings: null,
+      history,
     };
     void this.loadSchedule();
     if (programme) void this.loadAirings(programme);
   }
 
   /** Shows the programme view for a programme of the open channel, on the given day. */
-  private showProgramme(programme: Programme, day: string): void {
+  private showProgramme(programme: Programme, day: string, history: Screen[]): void {
     if (!this.details) return;
-    this.details = { ...this.details, day, programme, showProgramme: true, airings: null };
+    this.details = { ...this.details, day, programme, showProgramme: true, airings: null, history };
     void this.loadAirings(programme);
   }
 
