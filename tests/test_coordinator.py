@@ -97,7 +97,7 @@ async def test_added_channel_keeps_the_old_ones_while_the_source_is_down(
     await GuideStore(hass, mock_entry.entry_id).async_save(_stored_for(guide_xml, "TVN"))
     aioclient_mock.get(URL, status=503)
     await hass.config_entries.async_setup(mock_entry.entry_id)
-    await hass.async_block_till_done()
+    await hass.async_block_till_done(wait_background_tasks=True)
     assert mock_entry.state is ConfigEntryState.LOADED
     data = mock_entry.runtime_data.data
     assert data.programmes["TVN"]
@@ -110,7 +110,7 @@ async def test_added_channel_gets_programmes_after_the_background_refresh(
     await GuideStore(hass, mock_entry.entry_id).async_save(_stored_for(guide_xml, "TVN"))
     aioclient_mock.get(URL, content=guide_xml)
     await hass.config_entries.async_setup(mock_entry.entry_id)
-    await hass.async_block_till_done()
+    await hass.async_block_till_done(wait_background_tasks=True)
     assert mock_entry.runtime_data.data.programmes["Polsat"]
 
 
@@ -142,7 +142,7 @@ async def test_stored_guide_is_refreshed_in_background(hass, aioclient_mock, moc
     await GuideStore(hass, mock_entry.entry_id).async_save(guide)
     aioclient_mock.get(URL, content=guide_xml)
     await hass.config_entries.async_setup(mock_entry.entry_id)
-    await hass.async_block_till_done()
+    await hass.async_block_till_done(wait_background_tasks=True)
     assert aioclient_mock.call_count == 1
     assert mock_entry.runtime_data.last_update_success is True
     assert mock_entry.runtime_data.data.fetched_at != NOW
