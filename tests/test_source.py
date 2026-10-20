@@ -10,7 +10,7 @@ import aiohttp
 import pytest
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from custom_components.tv_guide.source import SourceError, fetch_source, open_source
+from custom_components.tv_guide.source import SourceError, fetch_source, open_source, safe_url
 from tests.conftest import URL
 
 
@@ -53,6 +53,36 @@ async def test_fetch_connection_error_and_timeout_raise(aioclient_mock, hass, er
     aioclient_mock.get(URL, exc=error)
     with pytest.raises(SourceError):
         await fetch_source(async_get_clientsession(hass), URL)
+
+
+SECRET_URL = "https://user:pass@iptv.example:8080/xmltv/key123/guide.xml?username=me&password=secret"
+
+
+def test_safe_url_keeps_only_the_server() -> None:
+    """IPTV providers put the login in the path, the query or the user part. Logs must not show it."""
+    assert safe_url(SECRET_URL) == "https://iptv.example:8080"
+    assert safe_url("http://epg.example/pl.gz") == "http://epg.example"
+    assert safe_url("not a url") == "the source"
+
+
+@pytest.mark.parametrize(
+    ("mock", "text"),
+    [
+        ({"status": 404}, "HTTP 404 from https://iptv.example:8080"),
+        ({"exc": TimeoutError}, "Timeout while downloading from https://iptv.example:8080"),
+        (
+            {"exc": aiohttp.ClientConnectionError(f"Cannot reach {SECRET_URL}")},
+            "Cannot download from https://iptv.example",
+        ),
+    ],
+)
+async def test_fetch_errors_hide_the_login(aioclient_mock, hass, mock, text) -> None:
+    aioclient_mock.get(SECRET_URL, **mock)
+    with pytest.raises(SourceError) as error:
+        await fetch_source(async_get_clientsession(hass), SECRET_URL)
+    assert text in str(error.value)
+    for secret in ("key123", "secret", "user:pass", "username"):
+        assert secret not in str(error.value)
 
 
 @pytest.mark.parametrize("pack", [gzip.compress, lzma.compress, zip_one_xml, lambda b: b])
