@@ -25,7 +25,7 @@ import { formatLastSuccess, isStale } from './data/stale';
 import { overlapsDay } from './components/view-parts';
 import { hour12, timeZoneOf, tvDayKey, tvDayRange, tvDays } from './data/time';
 import { localeOf, resolveLanguage, translator, type Translate } from './i18n';
-import type { GuideErrorCode, GuideInfo, NowMap, Programme } from './types/api';
+import type { GuideErrorCode, GuideInfo, NowMap, Programme, Reminders } from './types/api';
 import type { HomeAssistant } from './types/hass';
 import { tvGuideStyles } from './tv-guide-styles';
 
@@ -98,6 +98,8 @@ export class TvGuide extends LitElement {
   @state() private activeNumber?: ChannelNumber;
   @state() private switchingNumber?: ChannelNumber;
   @state() private details?: Details;
+  /** The reminders and phones of the user. `undefined` until they load; a failed load keeps the old value. */
+  @state() private reminders?: Reminders;
 
   private hassObject?: HomeAssistant;
   private client?: GuideClient;
@@ -135,6 +137,7 @@ export class TvGuide extends LitElement {
     this.loadError = undefined;
     this.icons = new Map();
     this.keptIds = undefined;
+    this.reminders = undefined;
     this.entries = channelEntries(config, this.icons);
     this.query = '';
     this.results = undefined;
@@ -235,6 +238,13 @@ export class TvGuide extends LitElement {
     if (!client || !config) return;
     this.nowMs = Date.now();
     const ids = channelIds(config);
+    // Reminders are a side feature: a failure here must not touch the guide, so they stay out of the `Promise.all`.
+    client.reminders().then(
+      (reminders) => {
+        if (run === this.refreshRun && client === this.client) this.reminders = reminders;
+      },
+      () => undefined,
+    );
     try {
       const [info, guideChannels, nowMap] = await Promise.all([
         client.info(),
@@ -317,6 +327,36 @@ export class TvGuide extends LitElement {
   private readonly onSwitch = (event: HTMLElementEventMap['tvg-switch']): void => {
     const channel = this.channelByNumber(event.detail.number);
     if (channel) this.switchTo(channel);
+  };
+
+  // ---- reminders ----
+
+  /** Ids of the programmes the user has a reminder for. */
+  private get remindedIds(): ReadonlySet<string> {
+    return new Set(this.reminders?.reminders.map((reminder) => reminder.programme_id));
+  }
+
+  /** A tap on the bell. The answer is the full list, so the card never gets out of step. A failure goes to the HA notification area. */
+  private readonly onReminder = (event: HTMLElementEventMap['tvg-reminder']): void => {
+    const { client, hassObject } = this;
+    if (!client || !hassObject) return;
+    const { programmeId, on } = event.detail;
+    const t = this.strings();
+    const request = on ? client.addReminder(programmeId, hassObject.locale.language) : client.removeReminder(programmeId);
+    request.then(
+      (reminders) => {
+        if (client === this.client) this.reminders = reminders;
+      },
+      (error: unknown) => {
+        this.dispatchEvent(
+          new CustomEvent('hass-notification', {
+            detail: { message: t('reminderFailed', { error: errorText(error) }) },
+            bubbles: true,
+            composed: true,
+          }),
+        );
+      },
+    );
   };
 
   // ---- search ----
@@ -503,6 +543,7 @@ export class TvGuide extends LitElement {
       @tvg-back=${this.onBack}
       @tvg-close=${this.onClose}
       @tvg-show-earlier=${this.onShowEarlier}
+      @tvg-reminder=${this.onReminder}
     >
       <tvg-search-box class="panel" .value=${this.query} .t=${t}></tvg-search-box>
       ${stale ? html`<div class="stale">${t('staleGuide', { date_time: this.lastSuccessText() })}</div>` : nothing}
@@ -646,6 +687,7 @@ export class TvGuide extends LitElement {
         .startHour=${config.tv_day_starts_at}
         .darkMode=${darkMode}
         .loading=${details.loading}
+        .remindedIds=${this.remindedIds}
         .error=${details.error
           ? t(loadErrorKey(details.error))
           : notSelected(channel, this.keptIds)
@@ -668,6 +710,8 @@ export class TvGuide extends LitElement {
             .hour12=${use12Hour}
             .startHour=${config.tv_day_starts_at}
             .darkMode=${darkMode}
+            .reminded=${this.remindedIds.has(programme.id)}
+            .noPhone=${this.reminders?.phones.length === 0}
           ></tvg-programme-view>`
         : nothing}
     </tvg-sheet>`;
