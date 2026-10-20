@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.helpers.event import async_track_point_in_utc_time
+from homeassistant.helpers.start import async_at_started
 from homeassistant.util import dt as dt_util
 
 from .const import MOVE_WINDOW, REMINDER_LEAD
@@ -83,13 +84,20 @@ class Reminder:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Reminder:
-        """Build a reminder from the output of `to_dict`."""
+        """Build a reminder from the output of `to_dict`.
+
+        Raises `ValueError` when the start has no offset: a time without a time zone is not
+        a valid stored reminder.
+        """
+        start = datetime.fromisoformat(data["start"])
+        if start.tzinfo is None:
+            raise ValueError("The start of a reminder needs a time zone")
         return cls(
             user_id=data["user_id"],
             programme_id=data["programme_id"],
             channel_id=data["channel_id"],
             title=data["title"],
-            start=datetime.fromisoformat(data["start"]),
+            start=start,
             language=data["language"],
         )
 
@@ -111,7 +119,7 @@ def find_moved(reminder: Reminder, guide: Guide) -> Programme | None:
     candidates = [
         p
         for p in guide.programmes.get(reminder.channel_id, [])
-        if normalize(p.title) == title and abs(p.start - reminder.start) <= MOVE_WINDOW
+        if abs(p.start - reminder.start) <= MOVE_WINDOW and normalize(p.title) == title
     ]
     return min(candidates, key=lambda p: abs(p.start - reminder.start), default=None)
 
@@ -119,9 +127,10 @@ def find_moved(reminder: Reminder, guide: Guide) -> Programme | None:
 def reconcile(reminders: list[Reminder], guide: Guide) -> ReconcileResult:
     """Match every reminder with the new guide.
 
-    A reminder is gone only when its channel has programmes around the old start but none is
-    the right one. A channel with no data there (deselected, a gap in the source) keeps the
-    reminder as it is: this stops false "gone" notices.
+    A reminder is gone only when the channel has a programme at the old start and no moved
+    copy of the reminder programme exists. Without a programme at the old start (the channel
+    is deselected, or the source has a gap) the reminder stays as it is: this stops false
+    "gone" notices.
     """
     kept: list[Reminder] = []
     gone: list[Reminder] = []
@@ -129,17 +138,16 @@ def reconcile(reminders: list[Reminder], guide: Guide) -> ReconcileResult:
         found = guide.find(reminder.programme_id) or find_moved(reminder, guide)
         if found:
             kept.append(reminder.moved_to(found))
-        elif _has_data_around(reminder, guide):
+        elif _has_programme_at_start(reminder, guide):
             gone.append(reminder)
         else:
             kept.append(reminder)
     return ReconcileResult(kept=kept, gone=gone)
 
 
-def _has_data_around(reminder: Reminder, guide: Guide) -> bool:
-    """Whether the channel has a programme that overlaps the window around the old start."""
-    low, high = reminder.start - MOVE_WINDOW, reminder.start + MOVE_WINDOW
-    return any(p.start < high and p.stop > low for p in guide.programmes.get(reminder.channel_id, []))
+def _has_programme_at_start(reminder: Reminder, guide: Guide) -> bool:
+    """Whether a programme of the channel is on air at the old start of the reminder."""
+    return any(p.start <= reminder.start < p.stop for p in guide.programmes.get(reminder.channel_id, []))
 
 
 class TooLate(Exception):
@@ -167,6 +175,8 @@ class ReminderManager:
         self._guide = guide
         self._reminders: list[Reminder] = []
         self._timers: dict[ReminderKey, CALLBACK_TYPE] = {}
+        self._started_waiters: list[CALLBACK_TYPE] = []
+        self._unloaded = False
 
     async def async_load(self) -> None:
         """Read the reminders from disk and plan their timers."""
@@ -187,10 +197,10 @@ class ReminderManager:
 
         Raises `TooLate` when the reminder time has passed.
         """
-        if programme.start - REMINDER_LEAD <= dt_util.utcnow():
-            raise TooLate
         if any(r.user_id == user_id and r.programme_id == programme.id for r in self._reminders):
             return
+        if programme.start - REMINDER_LEAD <= dt_util.utcnow():
+            raise TooLate
         self._reminders = [*self._reminders, Reminder.from_programme(user_id, programme, supported_language(language))]
         await self._store.async_save(self._reminders)
         await self._async_plan_timers()
@@ -211,8 +221,12 @@ class ReminderManager:
 
     @callback
     def unload(self) -> None:
-        """Cancel all timers."""
+        """Cancel all timers, and the sends that wait for the start of Home Assistant."""
+        self._unloaded = True
         self._cancel_timers()
+        for cancel in self._started_waiters:
+            cancel()
+        self._started_waiters.clear()
 
     async def _async_reconcile(self) -> None:
         """Move the reminders of moved programmes, and tell the user about the gone ones."""
@@ -234,8 +248,11 @@ class ReminderManager:
         """Plan the timers again for the whole list.
 
         A reminder whose programme has started is dropped without a notice. One that is due
-        but whose programme has not started fires at once.
+        but whose programme has not started is sent as soon as Home Assistant has started: at
+        startup the `mobile_app` notify services may not exist yet.
         """
+        if self._unloaded:
+            return
         self._cancel_timers()
         now = dt_util.utcnow()
         before = len(self._reminders)
@@ -247,7 +264,26 @@ class ReminderManager:
             )
         if len(self._reminders) != before:
             await self._store.async_save(self._reminders)
-        for reminder in due_now:
+        # The save above waits, so an unload can have happened meanwhile.
+        if due_now and not self._unloaded:
+            self._send_when_started(due_now)
+
+    def _send_when_started(self, reminders: list[Reminder]) -> None:
+        """Send the reminders in a background task of the entry, once Home Assistant is running.
+
+        This runs at once when Home Assistant is already running. `unload` cancels a send that
+        still waits.
+        """
+
+        @callback
+        def send(_hass: HomeAssistant) -> None:
+            self._entry.async_create_background_task(self._hass, self._async_send_all(reminders), "tv_guide reminders")
+
+        self._started_waiters.append(async_at_started(self._hass, send))
+
+    async def _async_send_all(self, reminders: list[Reminder]) -> None:
+        """Send the "starting" notice of each reminder. They are already deleted and saved."""
+        for reminder in reminders:
             await self._async_deliver(reminder, "starting")
 
     def _timer_action(self, reminder: Reminder) -> Callable[[datetime], Coroutine[Any, Any, None]]:
@@ -269,7 +305,13 @@ class ReminderManager:
         self._timers.clear()
 
     async def _async_deliver(self, reminder: Reminder, kind: ReminderKind) -> None:
-        """Send the notification. The caller has already removed and saved the reminder."""
+        """Send the notification. The caller has already removed and saved the reminder.
+
+        A failure is logged and goes no further: the other reminders must still be sent.
+        """
         guide = self._guide()
         channel = guide.channels.get(reminder.channel_id) if guide else None
-        await async_deliver(self._hass, reminder, kind, channel.name if channel else reminder.channel_id)
+        try:
+            await async_deliver(self._hass, reminder, kind, channel.name if channel else reminder.channel_id)
+        except Exception:
+            _LOGGER.exception("Cannot send the %s notice of the reminder for %s", kind, reminder.title)

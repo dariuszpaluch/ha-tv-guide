@@ -77,3 +77,10 @@ async def test_reminder_store_remove(hass, hass_storage) -> None:
     await store.async_save([make_reminder()])
     await store.async_remove()
     assert "tv_guide.e1.reminders" not in hass_storage
+
+
+async def test_reminder_store_start_without_a_time_zone_is_damaged(hass, hass_storage) -> None:
+    data = make_reminder().to_dict()
+    data["start"] = "2026-10-20T19:55:00"
+    hass_storage["tv_guide.e1.reminders"] = {"version": 1, "data": {"reminders": [data]}}
+    assert await ReminderStore(hass, "e1").async_load() == []

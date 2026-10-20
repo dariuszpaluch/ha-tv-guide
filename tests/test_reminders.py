@@ -2,6 +2,8 @@
 
 from datetime import datetime, timedelta, timezone
 
+import pytest
+
 from custom_components.tv_guide.const import REMINDER_LEAD
 from custom_components.tv_guide.model import Guide, Programme
 from custom_components.tv_guide.reminders import Reminder, find_moved, reconcile
@@ -63,12 +65,31 @@ def test_moved_by_ten_minutes_is_found(guide: Guide) -> None:
 
 
 def test_moved_more_than_three_hours_is_gone(guide: Guide) -> None:
-    reminder = make("TVN|2026-10-20T14:40:00Z", "Uwaga", datetime(2026, 10, 20, 16, 40, tzinfo=WAW))
+    # "Fakty" covers 19:00-19:35 on 19 October. The only "Uwaga" is a day later, so no copy is near.
+    reminder = make("TVN|2026-10-19T17:10:00Z", "Uwaga", datetime(2026, 10, 19, 19, 10, tzinfo=WAW))
 
     result = reconcile([reminder], guide)
 
     assert result.kept == []
     assert result.gone == [reminder]
+
+
+def test_gap_in_the_source_shorter_than_three_hours_is_kept(guide: Guide) -> None:
+    # Nothing is on air at 19:40 on 20 October (the gap is 19:35-19:50), although there are
+    # programmes within three hours.
+    reminder = make("TVN|2026-10-20T17:40:00Z", "No such title", datetime(2026, 10, 20, 19, 40, tzinfo=WAW))
+
+    result = reconcile([reminder], guide)
+
+    assert result.kept == [reminder]
+    assert result.gone == []
+
+
+def test_a_start_equal_to_the_stop_of_a_programme_is_not_covered(guide: Guide) -> None:
+    # "Fakty" stops at 19:35 on 20 October and the next programme starts at 19:50.
+    reminder = make("TVN|2026-10-20T17:35:00Z", "No such title", datetime(2026, 10, 20, 19, 35, tzinfo=WAW))
+
+    assert reconcile([reminder], guide).kept == [reminder]
 
 
 def test_title_matches_after_normalize(guide: Guide) -> None:
@@ -141,3 +162,11 @@ def test_round_trip_to_dict() -> None:
     assert restored == reminder
     assert restored.start.utcoffset() == timedelta(hours=2)
     assert reminder.to_dict()["start"] == "2026-10-20T19:00:00+02:00"
+
+
+def test_from_dict_without_a_time_zone_is_refused() -> None:
+    data = make("TVN|2026-10-20T17:00:00Z", "Fakty", datetime(2026, 10, 20, 19, 0, tzinfo=PLUS_TWO)).to_dict()
+    data["start"] = "2026-10-20T19:00:00"
+
+    with pytest.raises(ValueError, match="time zone"):
+        Reminder.from_dict(data)

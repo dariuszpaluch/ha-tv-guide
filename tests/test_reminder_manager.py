@@ -7,7 +7,8 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 from freezegun.api import FrozenDateTimeFactory
-from homeassistant.core import HomeAssistant
+from homeassistant.const import EVENT_HOMEASSISTANT_STARTED
+from homeassistant.core import CoreState, HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry, async_fire_time_changed
 
 from custom_components.tv_guide.const import DOMAIN
@@ -41,6 +42,18 @@ class GuideHolder:
 def without(guide: Guide, title: str) -> Guide:
     """The guide with every programme of this title removed."""
     return replace(guide, programmes={c: [p for p in ps if p.title != title] for c, ps in guide.programmes.items()})
+
+
+def uwaga_replaced_by_a_longer_info(guide: Guide) -> Guide:
+    """The guide without "Uwaga" (19:55 on the 20th), but "Info" runs on into its slot.
+
+    Something is still on air at the old start, so a reminder for "Uwaga" is truly gone.
+    """
+    info = programme(guide, "TVN|2026-10-20T17:50:00Z")
+    uwaga = programme(guide, UWAGA)
+    longer = replace(info, stop=uwaga.stop)
+    tvn = [longer if p.id == info.id else p for p in guide.programmes["TVN"] if p.id != uwaga.id]
+    return replace(guide, programmes={**guide.programmes, "TVN": tvn})
 
 
 def shifted(guide: Guide, title: str, delta: timedelta) -> Guide:
@@ -148,6 +161,28 @@ async def test_too_late(hass, freezer, guide, manager) -> None:
     assert len(manager.for_user("u1")) == 1
 
 
+async def test_two_users_keep_the_same_programme_and_each_is_notified(hass, freezer, guide, deliver, manager) -> None:
+    await manager.async_add("u1", programme(guide, INFO), "en")
+    await manager.async_add("u2", programme(guide, INFO), "pl")
+
+    await tick(hass, freezer, at(19, 45))
+
+    assert deliver.await_count == 2
+    assert {call.args[1].user_id for call in deliver.await_args_list} == {"u1", "u2"}
+    assert manager.for_user("u1") == manager.for_user("u2") == []
+
+
+async def test_adding_again_inside_the_five_minutes_is_not_too_late(freezer, guide, manager) -> None:
+    await manager.async_add("u1", programme(guide, SPORT), "en")
+    freezer.move_to(at(19, 31))  # the reminder time (19:30) has passed, the timer has not run
+
+    await manager.async_add("u1", programme(guide, SPORT), "en")
+
+    assert len(manager.for_user("u1")) == 1
+    with pytest.raises(TooLate):
+        await manager.async_add("u2", programme(guide, SPORT), "en")
+
+
 async def test_two_users_same_programme(hass, freezer, guide, deliver, manager) -> None:
     await manager.async_add("u1", programme(guide, INFO), "en")
     await manager.async_add("u2", programme(guide, INFO), "en")
@@ -188,6 +223,107 @@ async def test_due_while_ha_was_off_fires_at_once(hass, freezer, guide, deliver,
     assert manager.for_user("u1") == []
 
 
+async def test_due_at_startup_waits_until_home_assistant_has_started(
+    hass, freezer, guide, deliver, make_manager, hass_storage
+) -> None:
+    await ReminderStore(hass, "e1").async_save([Reminder.from_programme("u1", programme(guide, INFO), "en")])
+    freezer.move_to(at(19, 47))
+    hass.set_state(CoreState.not_running)
+    try:
+        manager = make_manager()
+        await manager.async_load()
+        deliver.assert_not_called()
+        assert stored(hass_storage) == []  # already deleted: save before send
+
+        hass.set_state(CoreState.running)
+        hass.bus.async_fire(EVENT_HOMEASSISTANT_STARTED)
+        await hass.async_block_till_done()
+    finally:
+        hass.set_state(CoreState.running)
+
+    deliver.assert_awaited_once()
+    assert deliver.await_args.args[2] == "starting"
+
+
+async def test_unload_cancels_a_send_that_waits_for_the_start(hass, freezer, guide, deliver, make_manager) -> None:
+    await ReminderStore(hass, "e1").async_save([Reminder.from_programme("u1", programme(guide, INFO), "en")])
+    freezer.move_to(at(19, 47))
+    hass.set_state(CoreState.not_running)
+    try:
+        manager = make_manager()
+        await manager.async_load()
+        manager.unload()
+
+        hass.set_state(CoreState.running)
+        hass.bus.async_fire(EVENT_HOMEASSISTANT_STARTED)
+        await hass.async_block_till_done()
+    finally:
+        hass.set_state(CoreState.running)
+
+    deliver.assert_not_called()
+
+
+async def test_one_failing_delivery_does_not_stop_the_others(
+    hass, freezer, guide, deliver, make_manager, caplog
+) -> None:
+    info = programme(guide, INFO)
+    await ReminderStore(hass, "e1").async_save(
+        [Reminder.from_programme("u1", info, "en"), Reminder.from_programme("u2", info, "en")]
+    )
+    freezer.move_to(at(19, 47))
+    deliver.side_effect = [RuntimeError("boom"), None]
+    manager = make_manager()
+
+    await manager.async_load()
+
+    assert deliver.await_count == 2
+    assert "Cannot send" in caplog.text
+    assert manager.for_user("u1") == manager.for_user("u2") == []
+
+
+async def test_a_failing_delivery_from_a_timer_is_logged(hass, freezer, guide, deliver, manager, caplog) -> None:
+    deliver.side_effect = RuntimeError("boom")
+    await manager.async_add("u1", programme(guide, INFO), "en")
+
+    await tick(hass, freezer, at(19, 45))
+
+    deliver.assert_awaited_once()
+    assert "Cannot send" in caplog.text
+
+
+async def test_a_failing_gone_notice_does_not_stop_the_next(hass, guide, deliver, manager, holder) -> None:
+    await manager.async_add("u1", programme(guide, UWAGA), "en")
+    await manager.async_add("u2", programme(guide, UWAGA), "en")
+    holder.guide = uwaga_replaced_by_a_longer_info(guide)
+    deliver.side_effect = [RuntimeError("boom"), None]
+
+    manager.handle_guide_update()
+    await hass.async_block_till_done()
+
+    assert deliver.await_count == 2
+    assert [call.args[2] for call in deliver.await_args_list] == ["gone", "gone"]
+
+
+async def test_an_add_that_finishes_after_unload_plans_no_timer(hass, freezer, guide, deliver, manager) -> None:
+    manager.unload()
+    await manager.async_add("u1", programme(guide, INFO), "en")
+
+    await tick(hass, freezer, at(19, 45))
+
+    deliver.assert_not_called()
+
+
+async def test_an_unload_during_the_save_sends_nothing(hass, freezer, guide, deliver, make_manager) -> None:
+    await ReminderStore(hass, "e1").async_save([Reminder.from_programme("u1", programme(guide, INFO), "en")])
+    freezer.move_to(at(19, 47))
+    manager = make_manager()
+    with patch.object(ReminderStore, "async_save", AsyncMock(side_effect=lambda _reminders: manager.unload())):
+        await manager.async_load()
+    await hass.async_block_till_done()
+
+    deliver.assert_not_called()
+
+
 async def test_started_while_ha_was_off_is_dropped_silently(
     hass, freezer, guide, deliver, make_manager, hass_storage
 ) -> None:
@@ -218,7 +354,7 @@ async def test_guide_update_moves_the_timer(hass, freezer, guide, deliver, manag
 
 async def test_gone_sends_one_notice_after_saving(hass, freezer, guide, deliver, manager, holder, hass_storage) -> None:
     await manager.async_add("u1", programme(guide, UWAGA), "en")
-    holder.guide = without(guide, "Uwaga")
+    holder.guide = uwaga_replaced_by_a_longer_info(guide)
     held_when_sent: list[list[dict]] = []
     deliver.side_effect = lambda *_: held_when_sent.append(list(stored(hass_storage)))
 
