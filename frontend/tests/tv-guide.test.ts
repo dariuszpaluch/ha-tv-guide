@@ -735,8 +735,22 @@ test('a failed add shows one hass-notification', async () => {
   bell(el)?.click();
   await settle(el);
   expect(onNotification).toHaveBeenCalledTimes(1);
-  expect(onNotification).toHaveBeenCalledWith({ message: 'Cannot change the reminder: Too late' });
+  expect(onNotification).toHaveBeenCalledWith({ message: 'The programme starts in less than 5 minutes.' });
   expect(bell(el)?.getAttribute('aria-pressed')).toBe('false');
+});
+
+test('another failed add keeps the generic reminder error', async () => {
+  const { el, server } = await mount();
+  await openSport(el);
+  const onNotification = vi.fn();
+  el.addEventListener('hass-notification', (event) => onNotification((event as CustomEvent).detail));
+  server.fail = { code: 'not_loaded', message: 'Guide not loaded' };
+  server.failType = 'tv_guide/reminders/add';
+
+  bell(el)?.click();
+  await settle(el);
+  expect(onNotification).toHaveBeenCalledTimes(1);
+  expect(onNotification).toHaveBeenCalledWith({ message: 'Cannot change the reminder: Guide not loaded' });
 });
 
 test('a reminders failure does not break the guide', async () => {

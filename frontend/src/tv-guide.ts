@@ -350,7 +350,12 @@ export class TvGuide extends LitElement {
       (error: unknown) => {
         this.dispatchEvent(
           new CustomEvent('hass-notification', {
-            detail: { message: t('reminderFailed', { error: errorText(error) }) },
+            detail: {
+              message:
+                error instanceof GuideError && error.code === 'too_late'
+                  ? t('reminderTooLate')
+                  : t('reminderFailed', { error: errorText(error) }),
+            },
             bubbles: true,
             composed: true,
           }),

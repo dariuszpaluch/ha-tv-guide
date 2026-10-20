@@ -42,7 +42,8 @@
   "staleGuide": "Notice above the list when the last good download is old. {date_time} is a day and a time, such as 17 Oct, 12:30.",
   "switchFailed": "Error message when the switch action fails. {channel_name} is the channel name, {error} is the error text from Home Assistant, in English.",
   "remindMe": "Label of the bell button in the programme details. It sets a reminder that sends a phone notification 5 minutes before the programme starts. Screen readers say it. Shows while no reminder is set.",
-  "reminderSet": "Label of the bell button in the programme details while a reminder is set, and label of the small bell next to a programme time in the channel schedule. Screen readers say it.",
+  "reminderSet": "Label of the bell button in the programme details while a reminder is set, and label of the small bell under the time of a programme in the channel schedule. Screen readers say it.",
   "noPhone": "Warning in the programme details, under the time, when a reminder is set but Home Assistant knows no phone with the Home Assistant app for the user. The reminder still works for automations, but no notification is sent.",
-  "reminderFailed": "Error message when setting or removing a reminder fails. {error} is the error text from Home Assistant, in English."
+  "reminderFailed": "Error message when setting or removing a reminder fails. {error} is the error text from Home Assistant, in English.",
+  "reminderTooLate": "Toast shown when a reminder cannot be set because the programme starts too soon (in less than 5 minutes)."
 }

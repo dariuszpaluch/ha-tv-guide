@@ -43,5 +43,6 @@
   "remindMe": "Przypomnij 5 minut przed",
   "reminderSet": "Przypomnienie ustawione",
   "noPhone": "Nie znaleziono telefonu z aplikacją Home Assistant dla Twojego użytkownika.",
-  "reminderFailed": "Nie można zmienić przypomnienia: {error}"
+  "reminderFailed": "Nie można zmienić przypomnienia: {error}",
+  "reminderTooLate": "Program zaczyna się za mniej niż 5 minut."
 }

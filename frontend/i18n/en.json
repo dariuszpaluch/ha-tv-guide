@@ -43,5 +43,6 @@
   "remindMe": "Remind me 5 minutes before",
   "reminderSet": "Reminder set",
   "noPhone": "No phone with the Home Assistant app found for your user.",
-  "reminderFailed": "Cannot change the reminder: {error}"
+  "reminderFailed": "Cannot change the reminder: {error}",
+  "reminderTooLate": "The programme starts in less than 5 minutes."
 }
