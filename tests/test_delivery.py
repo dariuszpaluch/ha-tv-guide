@@ -70,6 +70,62 @@ def test_find_phones_are_sorted_by_name(hass: HomeAssistant) -> None:
     assert [phone.name for phone in find_phones(hass, "u1")] == ["Alpha", "Zeta"]
 
 
+def test_find_phones_skips_a_name_that_two_users_share(hass: HomeAssistant) -> None:
+    add_phone(hass, "u1", "iPhone")
+    add_phone(hass, "u2", "iPhone")
+    add_phone(hass, "u1", "Pixel 8")
+    async_mock_service(hass, "notify", "mobile_app_iphone")
+    async_mock_service(hass, "notify", "mobile_app_pixel_8")
+
+    assert find_phones(hass, "u1") == [Phone("Pixel 8", "mobile_app_pixel_8")]
+    assert find_phones(hass, "u2") == []
+
+
+def test_find_phones_warns_about_a_clash_only_when_asked(hass: HomeAssistant, caplog: pytest.LogCaptureFixture) -> None:
+    add_phone(hass, "u1", "iPhone")
+    add_phone(hass, "u2", "iPhone")
+    async_mock_service(hass, "notify", "mobile_app_iphone")
+
+    find_phones(hass, "u1")
+    assert "Rename" not in caplog.text
+
+    find_phones(hass, "u1", warn_on_clash=True)
+    assert "iPhone" in caplog.text
+    assert "Rename" in caplog.text
+
+
+def test_find_phones_merges_names_with_one_service(hass: HomeAssistant) -> None:
+    add_phone(hass, "u1", "Pixel 8")
+    add_phone(hass, "u1", "Pixel-8")
+    async_mock_service(hass, "notify", "mobile_app_pixel_8")
+
+    assert find_phones(hass, "u1") == [Phone("Pixel 8", "mobile_app_pixel_8")]
+
+
+async def test_phone_clash_sends_nothing_but_the_event_still_fires(
+    hass: HomeAssistant, phones: None, caplog: pytest.LogCaptureFixture
+) -> None:
+    add_phone(hass, "u2", "Pixel 8")
+    pixel = async_mock_service(hass, "notify", "mobile_app_pixel_8")
+    events = async_capture_events(hass, EVENT_REMINDER)
+
+    await async_deliver(hass, make_reminder(), "starting", "TVN")
+    await hass.async_block_till_done()
+
+    assert pixel == []
+    assert len(events) == 1
+    assert "Rename" in caplog.text
+
+
+async def test_no_phone_still_fires_the_event(hass: HomeAssistant) -> None:
+    events = async_capture_events(hass, EVENT_REMINDER)
+
+    await async_deliver(hass, make_reminder(), "starting", "TVN")
+    await hass.async_block_till_done()
+
+    assert len(events) == 1
+
+
 async def test_starting_goes_to_each_phone_and_fires_the_event(hass: HomeAssistant, phones: None) -> None:
     pixel = async_mock_service(hass, "notify", "mobile_app_pixel_8")
     iphone = async_mock_service(hass, "notify", "mobile_app_iphone")

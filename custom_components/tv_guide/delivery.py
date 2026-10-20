@@ -43,19 +43,39 @@ def supported_language(language: str) -> str:
     return base if base in SUPPORTED_LANGUAGES else DEFAULT_LANGUAGE
 
 
-def find_phones(hass: HomeAssistant, user_id: str) -> list[Phone]:
+def find_phones(hass: HomeAssistant, user_id: str, *, warn_on_clash: bool = False) -> list[Phone]:
     """The phones of a user that can get a push notification, sorted by name.
 
     `mobile_app` does not promise this as a public API. It keeps one config entry per phone,
-    with the user and the name of the phone, and names the notify service `mobile_app_<name>`.
-    A phone with push turned off has no service, so it is left out.
+    with the user and the name of the phone, and names the notify service
+    `mobile_app_<name>`. The name is not unique: two phones with one name share one service,
+    and that service reaches only one of them. So a service whose name belongs to phones of
+    more than one user is left out for everyone: it could send a reminder to the wrong person.
+    A phone with push turned off has no service, so it is left out too.
+
+    The warning about a clash is off by default, because the card asks for the list every
+    minute. A delivery turns it on: it happens rarely, and the log then names the cause.
     """
-    phones: list[Phone] = []
+    owners: dict[str, set[str | None]] = {}
+    own: dict[str, str] = {}
     for entry in hass.config_entries.async_entries(MOBILE_APP):
         name = entry.data.get("device_name")
-        if not name or entry.data.get("user_id") != user_id:
+        if not name:
             continue
         service = slugify(f"{MOBILE_APP}_{name}")
+        owners.setdefault(service, set()).add(entry.data.get("user_id"))
+        if entry.data.get("user_id") == user_id:
+            own.setdefault(service, name)
+    phones: list[Phone] = []
+    for service, name in own.items():
+        if len(owners[service]) > 1:
+            if warn_on_clash:
+                _LOGGER.warning(
+                    "Two users have a phone named %s in the Companion app, so no reminder goes to it. "
+                    "Rename one of the phones.",
+                    name,
+                )
+            continue
         if hass.services.has_service("notify", service):
             phones.append(Phone(name, service))
     return sorted(phones, key=lambda phone: phone.name)
@@ -68,7 +88,7 @@ async def async_deliver(hass: HomeAssistant, reminder: Reminder, kind: ReminderK
     """
     title, message = await _async_texts(hass, reminder, kind, channel_name)
     data = {"title": title, "message": message, "data": {"tag": f"tv_guide_{reminder.programme_id}"}}
-    for phone in find_phones(hass, reminder.user_id):
+    for phone in find_phones(hass, reminder.user_id, warn_on_clash=True):
         try:
             await hass.services.async_call("notify", phone.service, data, blocking=True)
         except HomeAssistantError as err:
