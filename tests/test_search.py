@@ -5,6 +5,7 @@ import pytest
 
 from custom_components.tv_guide.search import (
     airings,
+    next_up,
     normalize,
     now_on_air,
     schedule,
@@ -45,6 +46,26 @@ def test_now_unknown_channel(guide):
 
 def test_now_nothing_on_air(guide):
     assert now_on_air(guide, ["TVN"], datetime(2026, 10, 19, 12, tzinfo=WAW)) == {"TVN": None}
+
+
+def test_next_up(guide):
+    result = next_up(guide, ["TVN", "Polsat"], NOW)
+    assert (result["TVN"].title, result["Polsat"].title) == ("Sport", "Mecz (finał) *")
+
+
+def test_next_up_between_programmes(guide):
+    # Nothing is on air at noon; the next one is the evening news.
+    assert next_up(guide, ["TVN"], datetime(2026, 10, 19, 12, tzinfo=WAW))["TVN"].title == "Fakty"
+
+
+def test_next_up_starting_now_is_not_next(guide):
+    at_start = datetime(2026, 10, 19, 19, 35, tzinfo=WAW)
+    assert next_up(guide, ["TVN"], at_start)["TVN"].title == "Info"
+
+
+def test_next_up_unknown_channel_and_end_of_guide(guide):
+    assert next_up(guide, ["Nope"], NOW) == {"Nope": None}
+    assert next_up(guide, ["TVN"], datetime(2026, 12, 1, tzinfo=WAW)) == {"TVN": None}
 
 
 def test_schedule_overlap(guide):

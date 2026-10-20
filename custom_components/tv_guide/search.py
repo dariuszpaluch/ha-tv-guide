@@ -29,6 +29,11 @@ def now_on_air(guide: Guide, channel_ids: list[str], now: datetime) -> dict[str,
     return {channel_id: _on_air(guide.programmes.get(channel_id, []), now) for channel_id in channel_ids}
 
 
+def next_up(guide: Guide, channel_ids: list[str], now: datetime) -> dict[str, Programme | None]:
+    """Map every channel id to the first programme that starts after `now`, or None."""
+    return {channel_id: _first_after(guide.programmes.get(channel_id, []), now) for channel_id in channel_ids}
+
+
 def schedule(guide: Guide, channel_id: str, start: datetime, end: datetime) -> list[Programme]:
     """Programmes of a channel that overlap `[start, end)`, sorted by start."""
     items = guide.programmes.get(channel_id, [])
@@ -93,6 +98,11 @@ def _on_air(items: list[Programme], now: datetime) -> Programme | None:
     if index == 0 or items[index - 1].stop <= now:
         return None
     return items[index - 1]
+
+
+def _first_after(items: list[Programme], now: datetime) -> Programme | None:
+    index = bisect_right(items, now, key=_start)
+    return items[index] if index < len(items) else None
 
 
 def _after(items: list[Programme], now: datetime) -> list[Programme]:

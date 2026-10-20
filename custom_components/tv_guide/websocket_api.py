@@ -18,7 +18,7 @@ from .coordinator import TvGuideCoordinator
 from .delivery import find_phones
 from .model import channel_to_json, programme_to_json
 from .reminders import TooLate
-from .search import airings, normalize, now_on_air, schedule, search_later, search_now
+from .search import airings, next_up, normalize, now_on_air, schedule, search_later, search_now
 
 ERR_NOT_LOADED = "not_loaded"
 ERR_TOO_LATE = "too_late"
@@ -84,6 +84,7 @@ def async_register_commands(hass: HomeAssistant) -> None:
         ws_info,
         ws_channels,
         ws_now,
+        ws_next,
         ws_schedule,
         ws_search,
         ws_airings,
@@ -160,6 +161,22 @@ async def ws_now(
     """Send the programme on air now for every requested channel."""
     on_air = now_on_air(coordinator.data, msg["channel_ids"], dt_util.now())
     connection.send_result(msg["id"], {cid: p and programme_to_json(p) for cid, p in on_air.items()})
+
+
+@websocket_api.websocket_command(
+    {"type": f"{DOMAIN}/next", pb.Optional("entry_id"): str, pb.Required("channel_ids"): [str]}
+)
+@websocket_api.async_response
+@_with_coordinator
+async def ws_next(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+    coordinator: TvGuideCoordinator,
+) -> None:
+    """Send the first programme that starts after now for every requested channel."""
+    upcoming = next_up(coordinator.data, msg["channel_ids"], dt_util.now())
+    connection.send_result(msg["id"], {cid: p and programme_to_json(p) for cid, p in upcoming.items()})
 
 
 @websocket_api.websocket_command(
