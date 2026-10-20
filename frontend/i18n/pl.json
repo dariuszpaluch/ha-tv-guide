@@ -39,5 +39,9 @@
   "loadFailed": "Nie można wczytać ramówki. Spróbuję za chwilę.",
   "cardDescription": "Ramówka TV: co jest teraz, program na kolejne dni, szukanie i przełączanie kanałów.",
   "staleGuide": "Ramówka z {date_time}",
-  "switchFailed": "Nie można przełączyć na {channel_name}: {error}"
+  "switchFailed": "Nie można przełączyć na {channel_name}: {error}",
+  "remindMe": "Przypomnij 5 minut przed",
+  "reminderSet": "Przypomnienie ustawione",
+  "noPhone": "Nie znaleziono telefonu z aplikacją Home Assistant dla Twojego użytkownika.",
+  "reminderFailed": "Nie można zmienić przypomnienia: {error}"
 }

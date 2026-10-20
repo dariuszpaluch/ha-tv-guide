@@ -1,6 +1,7 @@
 import { LitElement, css, html, nothing, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import type { ChannelConfig } from '../config';
+import { canRemind } from '../data/reminders';
 import { dayLabel, formatTime, progress, tvDayKey, whenText } from '../data/time';
 import type { Translate } from '../i18n';
 import type { Programme } from '../types/api';
@@ -64,6 +65,10 @@ export class TvgProgrammeView extends LitElement {
   /** Local hour at which a TV day starts. */
   @property({ attribute: false }) startHour = 5;
   @property({ attribute: false }) darkMode = false;
+  /** The user has a reminder for this programme. */
+  @property({ attribute: false }) reminded = false;
+  /** The integration found no phone with the HA app for the user, so a reminder only fires the event. */
+  @property({ attribute: false }) noPhone = false;
 
   @state() private expanded: Record<GroupKey, boolean> = { same: false, others: false };
 
@@ -111,6 +116,11 @@ export class TvgProgrammeView extends LitElement {
       .timing b {
         color: var(--primary-text-color);
         font-weight: 500;
+      }
+      .warn {
+        font-size: 13px;
+        color: var(--warning-color, var(--secondary-text-color));
+        margin: 0 0 6px;
       }
       .meta {
         display: flex;
@@ -211,7 +221,22 @@ export class TvgProgrammeView extends LitElement {
     return html`
       <div class="timing tnum"><b>${day}${range}</b><span>${when}</span></div>
       ${live ? html`<tvg-progress .value=${progress(programme, this.now)}></tvg-progress>` : nothing}
+      ${this.reminded && this.noPhone ? html`<div class="warn">${this.t('noPhone')}</div>` : nothing}
     `;
+  }
+
+  private renderBell(programme: Programme) {
+    if (!canRemind(programme, this.now)) return nothing;
+    const label = this.t(this.reminded ? 'reminderSet' : 'remindMe');
+    return html`<button
+      class="icon-btn"
+      data-reminder
+      aria-pressed=${this.reminded ? 'true' : 'false'}
+      aria-label=${label}
+      @click=${() => fire(this, 'tvg-reminder', { programmeId: programme.id, on: !this.reminded })}
+    >
+      ${icon(this.reminded ? 'bellRing' : 'bell')}
+    </button>`;
   }
 
   private renderChips(programme: Programme) {
@@ -286,7 +311,7 @@ export class TvgProgrammeView extends LitElement {
     return html`
       <header>
         ${renderBackButton(t('back'), () => fire(this, 'tvg-back', {}))}
-        ${renderChannelTitle(channel, this.logo, this.darkMode)}
+        ${renderChannelTitle(channel, this.logo, this.darkMode)} ${this.renderBell(programme)}
         ${renderCloseButton(t('close'), () => fire(this, 'tvg-close', {}))}
       </header>
       <div class="scroll">

@@ -5,6 +5,7 @@ import { dayLabel, formatTime, progress } from '../data/time';
 import type { Translate } from '../i18n';
 import type { Programme } from '../types/api';
 import { fire } from './events';
+import { icon } from './icons';
 import './tvg-day-chips';
 import './tvg-progress';
 import {
@@ -50,6 +51,8 @@ export class TvgChannelView extends LitElement {
   @property({ attribute: false }) loading = false;
   /** Text for a schedule that failed to load. Empty when the load worked. It replaces the "no guide" text. */
   @property({ attribute: false }) error = '';
+  /** Ids of the programmes with a reminder of the user. */
+  @property({ attribute: false }) remindedIds: ReadonlySet<string> = new Set();
 
   private readonly broken = new BrokenPosters(this);
 
@@ -88,6 +91,16 @@ export class TvgChannelView extends LitElement {
       }
       .slot .t {
         color: var(--secondary-text-color);
+      }
+      /* The time column is 42px wide, so the bell sits under the time, not beside it. */
+      .slot .rem {
+        display: flex;
+        margin-top: 2px;
+        color: var(--primary-color);
+      }
+      .slot .rem svg.i {
+        width: 14px;
+        height: 14px;
       }
       .slot .txt {
         min-width: 0;
@@ -171,7 +184,11 @@ export class TvgChannelView extends LitElement {
       class="slot ${past ? 'past' : ''} ${live ? 'live' : ''}"
       @click=${() => fire(this, 'tvg-open-programme', { number: this.channel.number, programmeId: programme.id })}
     >
-      <span class="t tnum">${formatTime(start, this.locale, this.timeZone, this.hour12)}</span>
+      <span class="t tnum"
+        >${formatTime(start, this.locale, this.timeZone, this.hour12)}${this.remindedIds.has(programme.id)
+          ? html`<span class="rem" role="img" aria-label=${this.t('reminderSet')}>${icon('bellRing')}</span>`
+          : nothing}</span
+      >
       ${renderPoster('thumb', poster, this.broken)}
       <span class="txt">
         <span class="title">${programme.title}</span>

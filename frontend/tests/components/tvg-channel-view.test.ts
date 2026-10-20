@@ -197,3 +197,13 @@ describe('programmes across the TV-day start', () => {
     expect($$(dayTwo, '.slot .title').map((s) => s.textContent)).toEqual(['Po zmianie']);
   });
 });
+
+test('a programme with a reminder has a small bell next to its time', async () => {
+  const info = earlier('TVN|2026-10-19T17:50:00Z', '2026-10-19T19:50:00+02:00', '2026-10-19T20:00:00+02:00');
+  const el = await mount({ programmes: [fakty, sport, info], remindedIds: new Set([info.id]) });
+  const [faktySlot, sportSlot, infoSlot] = $$(el, '.slot');
+  expect(infoSlot?.querySelector('.rem svg.i')).not.toBeNull();
+  expect(infoSlot?.querySelector('.rem')?.getAttribute('aria-label')).toBe('Reminder set');
+  expect(faktySlot?.querySelector('.rem')).toBeNull();
+  expect(sportSlot?.querySelector('.rem')).toBeNull();
+});

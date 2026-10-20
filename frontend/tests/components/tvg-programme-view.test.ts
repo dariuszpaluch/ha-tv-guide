@@ -1,6 +1,6 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import type { ChannelConfig } from '../../src/config';
-import { NOW, WAW, fakty, faktyDay3, faktyPolsat, faktyTomorrow, tEn, uwagaTomorrow, zycie } from '../fixtures';
+import { NOW, WAW, fakty, faktyDay3, faktyPolsat, faktyTomorrow, sport, tEn, uwagaTomorrow, zycie } from '../fixtures';
 import type { Programme } from '../../src/types/api';
 import '../../src/components/tvg-programme-view';
 import type { TvgProgrammeView } from '../../src/components/tvg-programme-view';
@@ -207,4 +207,41 @@ test('a live programme that started before the day start shows no day label and 
   expect(text($(el, '.timing b'))).toBe('04:30 - 05:30');
   expect(text($(el, '.timing > span'))).toBe('20 min left');
   expect($(el, 'tvg-progress')).not.toBeNull();
+});
+
+test('a bell for a later programme fires tvg-reminder on', async () => {
+  const el = await mount({ programme: sport });
+  const onReminder = vi.fn();
+  el.addEventListener('tvg-reminder', (e) => onReminder(e.detail));
+  const bell = $<HTMLButtonElement>(el, 'button[data-reminder]');
+  expect(bell?.getAttribute('aria-pressed')).toBe('false');
+  expect(bell?.getAttribute('aria-label')).toBe('Remind me 5 minutes before');
+  bell?.click();
+  expect(onReminder).toHaveBeenCalledWith({ programmeId: 'TVN|2026-10-19T17:35:00Z', on: true });
+});
+
+test('a pressed bell fires tvg-reminder off', async () => {
+  const el = await mount({ programme: sport, reminded: true });
+  const onReminder = vi.fn();
+  el.addEventListener('tvg-reminder', (e) => onReminder(e.detail));
+  const bell = $<HTMLButtonElement>(el, 'button[data-reminder]');
+  expect(bell?.getAttribute('aria-pressed')).toBe('true');
+  expect(bell?.getAttribute('aria-label')).toBe('Reminder set');
+  bell?.click();
+  expect(onReminder).toHaveBeenCalledWith({ programmeId: 'TVN|2026-10-19T17:35:00Z', on: false });
+});
+
+test('no bell for a programme on now or within 5 minutes', async () => {
+  const onNow = await mount({ programme: fakty });
+  expect($(onNow, '[data-reminder]')).toBeNull();
+  const soon = await mount({ programme: sport, now: Date.parse('2026-10-19T19:31:00+02:00') });
+  expect($(soon, '[data-reminder]')).toBeNull();
+});
+
+test('the no-phone warning shows only when the bell is on', async () => {
+  const warning = 'No phone with the Home Assistant app found for your user.';
+  const on = await mount({ programme: sport, reminded: true, noPhone: true });
+  expect(text($(on, '.warn'))).toBe(warning);
+  const off = await mount({ programme: sport, reminded: false, noPhone: true });
+  expect($(off, '.warn')).toBeNull();
 });
