@@ -15,10 +15,13 @@ from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN
 from .coordinator import TvGuideCoordinator
+from .delivery import find_phones
 from .model import channel_to_json, programme_to_json
+from .reminders import TooLate
 from .search import airings, normalize, now_on_air, schedule, search_later, search_now
 
 ERR_NOT_LOADED = "not_loaded"
+ERR_TOO_LATE = "too_late"
 MIN_QUERY_LENGTH = 2
 DEFAULT_SEARCH_LIMIT = 40
 MAX_SEARCH_LIMIT = 100
@@ -77,7 +80,17 @@ def _parse_time(value: str) -> datetime | None:
 
 def async_register_commands(hass: HomeAssistant) -> None:
     """Register all commands. Call once, from `async_setup`."""
-    for handler in (ws_info, ws_channels, ws_now, ws_schedule, ws_search, ws_airings):
+    for handler in (
+        ws_info,
+        ws_channels,
+        ws_now,
+        ws_schedule,
+        ws_search,
+        ws_airings,
+        ws_reminders_list,
+        ws_reminders_add,
+        ws_reminders_remove,
+    ):
         websocket_api.async_register_command(hass, handler)
 
 
@@ -236,3 +249,77 @@ async def ws_airings(
         airings, coordinator.data, msg["programme_id"], msg["channel_ids"], dt_util.now(), msg["limit"]
     )
     connection.send_result(msg["id"], [programme_to_json(p) for p in found])
+
+
+def _reminders_result(hass: HomeAssistant, coordinator: TvGuideCoordinator, user_id: str) -> dict[str, Any]:
+    """The reminders of one user, soonest first, and the names of the phones that get them."""
+    return {
+        "reminders": [
+            {
+                "programme_id": r.programme_id,
+                "channel_id": r.channel_id,
+                "title": r.title,
+                "start": r.start.isoformat(),
+            }
+            for r in coordinator.reminders.for_user(user_id)
+        ],
+        "phones": [phone.name for phone in find_phones(hass, user_id)],
+    }
+
+
+@websocket_api.websocket_command({"type": f"{DOMAIN}/reminders/list", pb.Optional("entry_id"): str})
+@websocket_api.async_response
+@_with_coordinator
+async def ws_reminders_list(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+    coordinator: TvGuideCoordinator,
+) -> None:
+    """Send the reminders of the user of the connection."""
+    connection.send_result(msg["id"], _reminders_result(hass, coordinator, connection.user.id))
+
+
+@websocket_api.websocket_command(
+    {
+        "type": f"{DOMAIN}/reminders/add",
+        pb.Optional("entry_id"): str,
+        pb.Required("programme_id"): str,
+        pb.Required("language"): str,
+    }
+)
+@websocket_api.async_response
+@_with_coordinator
+async def ws_reminders_add(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+    coordinator: TvGuideCoordinator,
+) -> None:
+    """Add a reminder for the user of the connection, then send all their reminders."""
+    programme = coordinator.data.find(msg["programme_id"]) if coordinator.data else None
+    if programme is None:
+        connection.send_error(msg["id"], websocket_api.ERR_NOT_FOUND, "No such programme in the guide")
+        return
+    try:
+        await coordinator.reminders.async_add(connection.user.id, programme, msg["language"])
+    except TooLate:
+        connection.send_error(msg["id"], ERR_TOO_LATE, "The programme starts in 5 minutes or less, or has started")
+        return
+    connection.send_result(msg["id"], _reminders_result(hass, coordinator, connection.user.id))
+
+
+@websocket_api.websocket_command(
+    {"type": f"{DOMAIN}/reminders/remove", pb.Optional("entry_id"): str, pb.Required("programme_id"): str}
+)
+@websocket_api.async_response
+@_with_coordinator
+async def ws_reminders_remove(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+    coordinator: TvGuideCoordinator,
+) -> None:
+    """Remove a reminder of the user of the connection, then send all their reminders."""
+    await coordinator.reminders.async_remove(connection.user.id, msg["programme_id"])
+    connection.send_result(msg["id"], _reminders_result(hass, coordinator, connection.user.id))
