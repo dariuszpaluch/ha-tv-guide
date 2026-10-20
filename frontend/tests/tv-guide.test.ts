@@ -486,6 +486,126 @@ test('a programme from the airings opens the channel and the day of that airing'
   });
 });
 
+type Sheet = HTMLElement & { open: boolean; showProgramme: boolean };
+
+/** Taps a programme row of the search results. */
+const openFromSearch = async (el: TvGuide, programmeId: string) => {
+  await typeQuery(el, 'fakty');
+  const row = $$<HTMLElement & { programme: Programme | null }>(el.shadowRoot, 'tvg-programme-row').find((r) => r.programme?.id === programmeId);
+  $<HTMLElement>(row?.shadowRoot, '.info')?.click();
+  await settle(el);
+};
+
+const tapBack = async (el: TvGuide) => {
+  $<HTMLElement>($(el.shadowRoot, 'tvg-programme-view')?.shadowRoot, '[data-back]')?.click();
+  await settle(el);
+};
+
+test('back from a programme opened in search closes the sheet and shows the search results again', async () => {
+  const { el } = await mount();
+  await openFromSearch(el, faktyPolsat.id);
+  const sheet = $<Sheet>(el.shadowRoot, 'tvg-sheet');
+  expect(sheet?.open).toBe(true);
+
+  await tapBack(el);
+  expect(sheet?.open).toBe(false);
+  expect($<HTMLInputElement>($(el.shadowRoot, 'tvg-search-box')?.shadowRoot, 'input')?.value).toBe('fakty');
+  expect($$(el.shadowRoot, 'tvg-programme-row').length).toBeGreaterThan(0);
+});
+
+test('a swipe back on a programme opened in search closes the sheet too', async () => {
+  const { el } = await mount();
+  await openFromSearch(el, faktyPolsat.id);
+  const sheet = $<Sheet>(el.shadowRoot, 'tvg-sheet');
+  sheet?.dispatchEvent(new CustomEvent('tvg-back', { detail: {}, bubbles: true, composed: true }));
+  await settle(el);
+  expect(sheet?.open).toBe(false);
+});
+
+const shownProgramme = (el: TvGuide) => $<HTMLElement & { programme: Programme }>(el.shadowRoot, 'tvg-programme-view')?.programme.id;
+const shownChannel = (el: TvGuide) => $<HTMLElement & { channel: { number: number } }>(el.shadowRoot, 'tvg-channel-view')?.channel.number;
+
+test('back from an airing shows the programme it was opened from, then search', async () => {
+  const setup = makeHass();
+  setup.server.airingsBy = { [faktyPolsat.id]: [fakty] };
+  const { el } = await mount(setup);
+  await openFromSearch(el, faktyPolsat.id);
+  $<HTMLElement>($(el.shadowRoot, 'tvg-programme-view')?.shadowRoot, '.air')?.click();
+  await settle(el);
+  expect(shownProgramme(el)).toBe(fakty.id);
+  expect(shownChannel(el)).toBe(5);
+
+  await tapBack(el);
+  const sheet = $<Sheet>(el.shadowRoot, 'tvg-sheet');
+  expect(sheet?.open).toBe(true);
+  expect(shownProgramme(el)).toBe(faktyPolsat.id);
+  expect(shownChannel(el)).toBe(3);
+  expect($<HTMLElement & { selectedDay: string }>(el.shadowRoot, 'tvg-channel-view')?.selectedDay).toBe('2026-10-20');
+
+  await tapBack(el);
+  expect(sheet?.open).toBe(false);
+});
+
+test('back walks the whole way: airing on another channel, programme, schedule', async () => {
+  const setup = makeHass();
+  setup.server.airings = [faktyPolsat];
+  const { el } = await mount(setup);
+  $<HTMLElement>(rowOf(el, 5)?.shadowRoot, '.info')?.click();
+  await settle(el);
+  $<HTMLElement>($(el.shadowRoot, 'tvg-channel-view')?.shadowRoot, '.slot')?.click();
+  await settle(el);
+  $<HTMLElement>($(el.shadowRoot, 'tvg-programme-view')?.shadowRoot, '.air')?.click();
+  await settle(el);
+  expect(shownChannel(el)).toBe(3);
+
+  const sheet = $<Sheet>(el.shadowRoot, 'tvg-sheet');
+  await tapBack(el);
+  expect(sheet?.showProgramme).toBe(true);
+  expect(shownProgramme(el)).toBe(fakty.id);
+  expect(shownChannel(el)).toBe(5);
+
+  await tapBack(el);
+  expect(sheet?.open).toBe(true);
+  expect(sheet?.showProgramme).toBe(false);
+  expect(shownChannel(el)).toBe(5);
+});
+
+test('back ignores the schedule answer of the screen it leaves', async () => {
+  const setup = makeHass();
+  setup.server.airings = [faktyPolsat];
+  const { el, server } = await mount(setup);
+  $<HTMLElement>(rowOf(el, 5)?.shadowRoot, '.info')?.click();
+  await settle(el);
+  $<HTMLElement>($(el.shadowRoot, 'tvg-channel-view')?.shadowRoot, '.slot')?.click();
+  await settle(el);
+  server.hold.add('tv_guide/schedule');
+  $<HTMLElement>($(el.shadowRoot, 'tvg-programme-view')?.shadowRoot, '.air')?.click();
+  await settle(el);
+
+  await tapBack(el);
+  server.release('tv_guide/schedule', (m) => m.channel_id === 'Polsat');
+  await settle(el);
+  const view = $<HTMLElement & { programmes: Programme[] }>(el.shadowRoot, 'tvg-channel-view');
+  expect(shownChannel(el)).toBe(5);
+  expect(view?.programmes.every((p) => p.channel_id === 'TVN')).toBe(true);
+});
+
+test('a new sheet from the list after a search sheet goes back to the schedule again', async () => {
+  const { el } = await mount();
+  await openFromSearch(el, faktyPolsat.id);
+  await tapBack(el);
+  await typeQuery(el, '');
+  $<HTMLElement>(rowOf(el, 5)?.shadowRoot, '.info')?.click();
+  await settle(el);
+  $<HTMLElement>($(el.shadowRoot, 'tvg-channel-view')?.shadowRoot, '.slot')?.click();
+  await settle(el);
+
+  await tapBack(el);
+  const sheet = $<Sheet>(el.shadowRoot, 'tvg-sheet');
+  expect(sheet?.open).toBe(true);
+  expect(sheet?.showProgramme).toBe(false);
+});
+
 test('an airing on the same channel but another day switches the selected day without a request', async () => {
   const setup = makeHass();
   setup.server.airings = [faktyTomorrow];
