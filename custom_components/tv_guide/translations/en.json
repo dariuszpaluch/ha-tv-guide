@@ -6,6 +6,9 @@
         "description": "Enter the address of an XMLTV file. The file can be plain XML, gzip, xz or zip.",
         "data": {
           "url": "XMLTV address"
+        },
+        "data_description": {
+          "url": "Plain XML, or a .gz, .xz or .zip file. Many TV guide sites and IPTV providers give such an address."
         }
       },
       "channels": {
@@ -13,6 +16,9 @@
         "description": "Choose the channels to keep in the guide.",
         "data": {
           "channels": "Channels"
+        },
+        "data_description": {
+          "channels": "Only these channels are kept in memory and on disk. You can change them later in the options."
         }
       }
     },
@@ -32,6 +38,10 @@
         "data": {
           "channels": "Channels",
           "update_interval": "Update interval (hours)"
+        },
+        "data_description": {
+          "channels": "Only these channels are kept in memory and on disk. A new channel gets its programmes when the guide is downloaded again, right after you save.",
+          "update_interval": "How often the guide is downloaded, from 1 to 48 hours."
         }
       }
     },
