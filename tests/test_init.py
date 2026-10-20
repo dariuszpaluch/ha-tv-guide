@@ -7,9 +7,19 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry, async_
 
 from custom_components.tv_guide.const import DOMAIN
 from custom_components.tv_guide.images import IMAGE_FOLDER
+from custom_components.tv_guide.reminders import ReminderManager
 from tests.conftest import URL, WAW
 
 INFO = "TVN|2026-10-19T17:50:00Z"  # 19:50 Warsaw time, the evening of `NOW`
+# The reminder for INFO as an old guide stored it: with an id that the guide does not have now.
+_STORED_REMINDER = {
+    "user_id": "u1",
+    "programme_id": "TVN|old-id",
+    "channel_id": "TVN",
+    "title": "Info",
+    "start": datetime(2026, 10, 19, 19, 50, tzinfo=WAW).isoformat(),
+    "language": "en",
+}
 
 
 def _add_poster(folder: Path) -> None:
@@ -48,30 +58,14 @@ async def test_setup_loads_reminders_and_a_guide_update_reconciles(
     # The stored programme id is out of date: the same programme now has another id.
     hass_storage[f"tv_guide.{mock_entry.entry_id}.reminders"] = {
         "version": 1,
-        "data": {
-            "reminders": [
-                {
-                    "user_id": "u1",
-                    "programme_id": "TVN|old-id",
-                    "channel_id": "TVN",
-                    "title": "Info",
-                    "start": datetime(2026, 10, 19, 19, 50, tzinfo=WAW).isoformat(),
-                    "language": "en",
-                }
-            ]
-        },
+        "data": {"reminders": [_STORED_REMINDER]},
     }
     aioclient_mock.get(URL, content=guide_xml)
 
     assert await hass.config_entries.async_setup(mock_entry.entry_id)
-    await hass.async_block_till_done()
-    # The guide was not loaded yet when the reminders were: nothing could be matched.
-    coordinator = mock_entry.runtime_data
-    assert [r.programme_id for r in coordinator.reminders.for_user("u1")] == ["TVN|old-id"]
-
-    await coordinator.async_refresh()
     await hass.async_block_till_done(wait_background_tasks=True)
 
+    coordinator = mock_entry.runtime_data
     assert [r.programme_id for r in coordinator.reminders.for_user("u1")] == [INFO]
 
 
@@ -99,3 +93,20 @@ async def test_remove_entry_deletes_the_reminder_store(clock_at_now, hass, loade
     await hass.config_entries.async_remove(loaded_entry.entry_id)
 
     assert key not in hass_storage
+
+
+async def test_failed_first_download_cancels_the_reminder_timers(
+    clock_at_now, hass, hass_storage, aioclient_mock, mock_entry
+) -> None:
+    hass_storage[f"tv_guide.{mock_entry.entry_id}.reminders"] = {
+        "version": 1,
+        "data": {"reminders": [{**_STORED_REMINDER, "programme_id": INFO}]},
+    }
+    aioclient_mock.get(URL, status=503)
+
+    # Not a check of a delivery: Home Assistant retries the setup on the next tick, and the new
+    # manager rightly sends a reminder that is due. A spy shows the failed attempt cancelled its timers.
+    with patch.object(ReminderManager, "unload", autospec=True, side_effect=ReminderManager.unload) as unload:
+        assert not await hass.config_entries.async_setup(mock_entry.entry_id)
+        assert mock_entry.state is ConfigEntryState.SETUP_RETRY
+        unload.assert_called_once()

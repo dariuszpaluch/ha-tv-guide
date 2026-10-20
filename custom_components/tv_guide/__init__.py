@@ -89,18 +89,23 @@ async def async_setup_entry(hass: HomeAssistant, entry: TvGuideConfigEntry) -> b
     download must work, otherwise Home Assistant retries the setup.
     """
     coordinator = TvGuideCoordinator(hass, entry)
+    # Registered before the load plans any timer: when the first download fails, Home Assistant
+    # runs the unload callbacks and retries, and the timers of this attempt must not stay alive.
+    # Unload callbacks run in reverse order, so the listener below goes first: after the timers
+    # are cancelled, a guide update must not plan new ones.
+    entry.async_on_unload(coordinator.reminders.unload)
     await coordinator.reminders.async_load()
     if await coordinator.async_load_stored():
         entry.async_create_background_task(hass, coordinator.async_refresh(), "tv_guide refresh")
     else:
         await coordinator.async_config_entry_first_refresh()
     entry.runtime_data = coordinator
-    # Unload callbacks run in reverse order. The listener must go first: after the timers
-    # are cancelled, a guide update must not plan new ones.
-    entry.async_on_unload(coordinator.reminders.unload)
     # The guide has no entities. A coordinator only schedules its timer while it has a listener.
     # This listener keeps the timer alive and checks the reminders after each update.
     entry.async_on_unload(coordinator.async_add_listener(coordinator.reminders.handle_guide_update))
+    # The first guide came before the listener existed, so match the loaded reminders with it now.
+    if coordinator.data is not None:
+        coordinator.reminders.handle_guide_update()
     return True
 
 
