@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      # uv reads `requires-python` from pyproject.toml and installs a matching Python.
+      # uv reads .python-version and installs that Python: the one Home Assistant runs on.
       - uses: astral-sh/setup-uv@v10.3.0
       - run: uv sync
       - run: uv run pytest --cov=custom_components/tv_guide --cov-report=term-missing
