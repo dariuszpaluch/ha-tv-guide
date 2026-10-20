@@ -1,5 +1,7 @@
 # TV guide for Home Assistant
 
+<img src="custom_components/tv_guide/brand/icon.png" alt="" width="96" align="right">
+
 [![HACS Custom](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz)
 [![Release](https://img.shields.io/github/v/release/dariuszpaluch/ha-tv-guide)](https://github.com/dariuszpaluch/ha-tv-guide/releases)
 [![CI](https://github.com/dariuszpaluch/ha-tv-guide/actions/workflows/ci.yml/badge.svg)](https://github.com/dariuszpaluch/ha-tv-guide/actions/workflows/ci.yml)

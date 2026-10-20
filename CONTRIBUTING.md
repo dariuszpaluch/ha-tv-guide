@@ -71,6 +71,10 @@ The integration setup screens: add `custom_components/tv_guide/translations/<lan
 
 The release workflow first runs all the tests and checks of `ci.yml` and `validate.yml`. Then it builds the card, writes the tag version into `manifest.json`, zips `custom_components/tv_guide` and adds `tv_guide.zip` to the release. HACS installs this zip. If a check fails, the release has no zip: fix the problem, delete the release and the tag, and create them again. The card URL carries the version, so browsers load the new card after an update.
 
+## Icon
+
+HA shows the icon from `custom_components/tv_guide/brand/`. The sources are `docs/images/icon.svg` and `docs/images/dark_icon.svg` (a lighter frame for dark themes). After a change, export each SVG as PNG with a transparent background: 256 px as `icon.png` or `dark_icon.png`, and 512 px as `icon@2x.png` or `dark_icon@2x.png`.
+
 ## CI
 
 All jobs run on GitHub-hosted runners (`ubuntu-latest`). Each push runs:
