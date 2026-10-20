@@ -1,6 +1,7 @@
 """TV guide for Home Assistant."""
 
 import logging
+import shutil
 from datetime import datetime
 from pathlib import Path
 
@@ -104,5 +105,13 @@ async def async_unload_entry(hass: HomeAssistant, entry: TvGuideConfigEntry) -> 
 
 
 async def async_remove_entry(hass: HomeAssistant, entry: TvGuideConfigEntry) -> None:
-    """Delete the stored guide with the entry."""
+    """Delete the stored guide with the entry, and the posters with the last entry.
+
+    All entries share one poster folder. Its daily cleanup runs only while the
+    integration is loaded, so without this the posters would stay on disk forever.
+    """
     await GuideStore(hass, entry.entry_id).async_remove()
+    others = [other for other in hass.config_entries.async_entries(DOMAIN) if other.entry_id != entry.entry_id]
+    if not others:
+        folder = hass.config.path(IMAGE_FOLDER)
+        await hass.async_add_executor_job(lambda: shutil.rmtree(folder, ignore_errors=True))

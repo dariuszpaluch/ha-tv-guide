@@ -15,6 +15,9 @@ First release.
 - WebSocket API for the card: `info`, `channels`, `now`, `schedule`, `search` and `airings`.
 - Poster cache: posters are downloaded once, resized and served by Home Assistant.
 - Serves the built card, so you add no Lovelace resource.
+- Diagnostics for bug reports: the state of the guide, without the login in the guide URL.
+- Logs and errors name only the server of the guide URL, never its path or query.
+- Removing the last guide also deletes the cached posters.
 
 ### Card
 
