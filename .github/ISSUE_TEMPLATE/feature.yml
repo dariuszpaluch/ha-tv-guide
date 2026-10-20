@@ -1,0 +1,16 @@
+name: Feature request
+description: An idea for the card or the integration.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does it solve
+      description: What you want to do, and why you cannot do it now.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: Your idea
+      description: How it could work. A sketch or a screenshot of another app helps.

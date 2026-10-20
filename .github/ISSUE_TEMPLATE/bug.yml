@@ -1,0 +1,65 @@
+name: Bug report
+description: Something does not work as the README says.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for the report. First read [Troubleshooting](https://github.com/dariuszpaluch/ha-tv-guide#troubleshooting): many problems have a fix there.
+        Do not paste your full guide URL: it can hold your login.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happens
+      description: What you did, what you expected and what you see instead. A screenshot helps.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: TV guide version
+      description: HACS → TV guide, or `version` in `custom_components/tv_guide/manifest.json`.
+      placeholder: 0.1.0
+    validations:
+      required: true
+  - type: input
+    id: ha-version
+    attributes:
+      label: Home Assistant version
+      description: Settings → About.
+      placeholder: 2026.10.2
+    validations:
+      required: true
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where you see the problem
+      multiple: true
+      options:
+        - Card in a desktop browser
+        - Card in the HA app (iOS)
+        - Card in the HA app (Android)
+        - Integration setup or options
+        - Logs only
+  - type: input
+    id: source
+    attributes:
+      label: Guide source
+      description: The server only, for example epg.ovh. Not the full URL.
+  - type: textarea
+    id: card-config
+    attributes:
+      label: Card config
+      description: The YAML of the card. You can shorten the channel list.
+      render: yaml
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics
+      description: Settings → Devices & services → TV guide → ⋮ → Download diagnostics. Drag the file here.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Debug log
+      description: Turn on debug logging (see Troubleshooting), repeat the problem, then paste the lines with `tv_guide`.
+      render: text
