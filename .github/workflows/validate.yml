@@ -9,7 +9,9 @@ on:
   workflow_dispatch:
   workflow_call:
 
-permissions: {}
+# A private repository needs read access for the checkout.
+permissions:
+  contents: read
 
 jobs:
   hassfest:
@@ -21,6 +23,14 @@ jobs:
   hacs:
     runs-on: ubuntu-latest
     steps:
-      - uses: hacs/action@main
+      # The HACS action fails on a private repository. Skip it until the repository is public.
+      - id: visibility
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: echo "private=$(gh api "repos/$GITHUB_REPOSITORY" --jq .private)" >> "$GITHUB_OUTPUT"
+      - if: steps.visibility.outputs.private == 'true'
+        run: echo "::notice::HACS validates only public repositories. The check is skipped."
+      - if: steps.visibility.outputs.private == 'false'
+        uses: hacs/action@main
         with:
           category: integration
