@@ -15,7 +15,7 @@ A TV guide in your Home Assistant dashboard: what is on now, what comes next, th
 
 ## Features
 
-- Channel list with the programme on now and a progress bar. Group the channels in sections.
+- Channel list with the programme on now, a progress bar and what comes next. Group the channels in sections.
 - Schedule for each day, with posters. It opens at the programme on now. A TV day starts at 05:00, like in a printed guide.
 - Channel details open full screen on a phone and as a dialog on a computer.
 - Programme details: poster, description, category, age rating, year, and more airings of the same programme.
