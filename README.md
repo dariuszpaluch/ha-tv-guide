@@ -148,11 +148,11 @@ switch_action:
 
 Open a programme and tap the bell to set a reminder. Tap it again to remove the reminder. The bell is available only when the programme starts in more than 5 minutes. A small bell under the time marks your reminder in the channel schedule.
 
-The phones of your HA user with the Home Assistant Companion app get a notification 5 minutes before the start. The integration finds the phones with a notify service. There is nothing to set in the card. Each user has their own reminders. The notification is in Polish or English, from the HA profile language when you set the reminder.
+The phones of your HA user with the Home Assistant Companion app get a notification 5 minutes before the start. The integration finds the phones with a notify service. A phone with push notifications turned off in the Companion app does not count. Two phones with the same name in HA get no notification, even when they belong to different users: rename one of them. There is nothing to set in the card. Each user has their own reminders. The notification is in Polish or English, from the HA profile language when you set the reminder.
 
 Reminders survive a Home Assistant restart. If HA starts after the reminder was due but before the programme starts, it sends the notification at once. If the programme has started, it deletes the reminder without a notice.
 
-When the guide changes, the reminder follows a programme with the same title on the same channel within 3 hours of its old start. If the programme is gone, you get one notice and the reminder is deleted. If the channel has no guide data around that time, the reminder keeps its stored start.
+When the guide changes, the reminder follows a programme with the same title on the same channel within 3 hours of its old start. If the programme is gone, you get one notice and the reminder is deleted. If the guide has no programme on that channel at the old start (for example a gap in the source), the reminder keeps its stored start.
 
 If the integration finds no phone for your user, the card shows a warning. The reminder still fires the `tv_guide_reminder` event. You can use this event in an automation, with or without a phone.
 

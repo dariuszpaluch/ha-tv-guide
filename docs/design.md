@@ -98,7 +98,7 @@ Reminders have their own HA `Store` at `<config>/.storage/tv_guide.<entry_id>.re
 
 The manager sets one HA timer per reminder, exactly 5 minutes before the start. There is no lead time setting. It plans all timers again after a change or a restart. If the reminder is due but the programme has not started, it fires at once. If the programme has started, the reminder is deleted without a notice. The manager removes and saves a reminder before delivery, so a restart cannot send it twice. Unloading the entry cancels the timers.
 
-After a guide update, the manager first looks for the programme id. If it is missing, it looks on the same channel for the same normalized title within 3 hours before or after the old start. The closest start wins. A match updates the reminder and its timer. Without a match, the manager sends one "no longer in the guide" notice and deletes the reminder. It does this only if the channel has programmes that overlap the search window. Without data there, it keeps the reminder and its stored start. A failed download does not change reminders.
+After a guide update, the manager first looks for the programme id. If it is missing, it looks on the same channel for the same normalized title within 3 hours before or after the old start. The closest start wins. A match updates the reminder and its timer. Without a match, the manager sends one "no longer in the guide" notice and deletes the reminder. It does this only if a programme of the channel is on air at the old start. Without one (the channel is deselected, or the source has a gap), it keeps the reminder and its stored start. A failed download does not change reminders.
 
 Delivery finds `mobile_app` config entries whose `user_id` matches the reminder. It builds each notify service name with `slugify("mobile_app_" + device_name)` and keeps only services that exist. No notify service needs to be set in the card. This uses internal Companion app data, so changes in HA may need changes here. A failed notify call is logged and does not stop delivery to the other phones.
 
@@ -145,4 +145,6 @@ The card shows a bell in programme details only when the start is more than 5 mi
 
 ## Ideas for later
 
-- Later still: a "Switch" button in the notification (the switch action must then move from the card config to the integration), a poster in the notification (needs an external URL), and a list of reminders in the card.
+- A "Switch" button in the notification. The switch action must then move from the card config to the integration.
+- A poster in the notification. It needs an external URL.
+- A list of all reminders in the card.
