@@ -3,6 +3,8 @@ name: CI
 on:
   push:
   pull_request:
+  # The release workflow runs these jobs first.
+  workflow_call:
 
 jobs:
   integration:

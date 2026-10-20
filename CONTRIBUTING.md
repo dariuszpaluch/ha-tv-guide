@@ -69,11 +69,11 @@ The integration setup screens: add `custom_components/tv_guide/translations/<lan
 2. Merge to `main` and check that CI passes.
 3. Create a GitHub release with the tag `vX.Y.Z`.
 
-The release workflow builds the card, writes the tag version into `manifest.json`, zips `custom_components/tv_guide` and adds `tv_guide.zip` to the release. HACS installs this zip. The card URL carries the version, so browsers load the new card after an update.
+The release workflow first runs all the tests and checks of `ci.yml` and `validate.yml`. Then it builds the card, writes the tag version into `manifest.json`, zips `custom_components/tv_guide` and adds `tv_guide.zip` to the release. HACS installs this zip. If a check fails, the release has no zip: fix the problem, delete the release and the tag, and create them again. The card URL carries the version, so browsers load the new card after an update.
 
 ## CI
 
-Each push runs:
+All jobs run on GitHub-hosted runners (`ubuntu-latest`). Each push runs:
 
 - the integration tests and lint, and the card tests, check and build (`ci.yml`);
 - [hassfest](https://developers.home-assistant.io/blog/2020/04/16/hassfest/) and the [HACS action](https://hacs.xyz/docs/publish/action) (`validate.yml`). They check `manifest.json`, the translations, `hacs.json` and the repository settings that HACS needs.

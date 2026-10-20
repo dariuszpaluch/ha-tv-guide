@@ -8,7 +8,16 @@ permissions:
   contents: write
 
 jobs:
+  # The release is already published when this runs. A failed check stops the zip upload,
+  # so HACS cannot install a broken build.
+  test:
+    uses: ./.github/workflows/ci.yml
+
+  validate:
+    uses: ./.github/workflows/validate.yml
+
   zip:
+    needs: [test, validate]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
