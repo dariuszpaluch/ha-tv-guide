@@ -11,8 +11,10 @@ permissions:
 
 # A new push to the same branch cancels the older run. The group name starts with `ci-`, so the
 # release workflow, which runs this and validate.yml at the same time, never cancels its own checks.
+# The group also has the workflow name: a new release pushes its tag, and the CI run for that tag
+# push must not cancel the checks of the release ("Release" in a called workflow).
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
