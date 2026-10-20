@@ -34,9 +34,23 @@ export interface GuideInfo {
   update_interval: number;
 }
 
+/** A reminder belonging to the user of the connection. */
+export interface Reminder {
+  programme_id: string;
+  channel_id: string;
+  title: string;
+  start: string;
+}
+
+/** Full reminder list and notification phone names for the user of the connection. */
+export interface Reminders {
+  reminders: Reminder[];
+  phones: string[];
+}
+
 /** Answer of `tv_guide/now`: a channel without a programme on air has `null`. */
 export type NowMap = Record<string, Programme | null>;
 
 export type SearchWhen = 'now' | 'later';
 
-export type GuideErrorCode = 'not_found' | 'not_loaded' | 'invalid_format';
+export type GuideErrorCode = 'not_found' | 'not_loaded' | 'invalid_format' | 'too_late';

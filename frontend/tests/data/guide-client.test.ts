@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { GuideClient, GuideError } from '../../src/data/guide-client';
+import type { Reminders } from '../../src/types/api';
 import { channels, fakty, NOW } from '../fixtures';
 
 type Message = Record<string, unknown>;
@@ -139,6 +140,42 @@ describe('GuideClient', () => {
     const { connection, sent } = fakeConnection(() => []);
     await new GuideClient(connection, undefined, clock).search('fakty', ['TVN'], 'now');
     expect(sent[0]).not.toHaveProperty('limit');
+  });
+
+  test.each([undefined, 'e1'])('reminder commands send the right messages and are never cached (entry %s)', async (entryId) => {
+    const programmeId = 'TVN|2026-10-19T17:50:00Z';
+    const answer: Reminders = {
+      reminders: [{ programme_id: programmeId, channel_id: 'TVN', title: 'Uwaga', start: '2026-10-19T19:50:00+02:00' }],
+      phones: ['Pixel 8'],
+    };
+    const { connection, sent } = fakeConnection(() => answer);
+    const client = new GuideClient(connection, entryId, clock);
+
+    await expect(client.addReminder(programmeId, 'pl')).resolves.toEqual(answer);
+    await expect(client.addReminder(programmeId, 'pl')).resolves.toEqual(answer);
+    await expect(client.reminders()).resolves.toEqual(answer);
+    await expect(client.reminders()).resolves.toEqual(answer);
+    await expect(client.removeReminder(programmeId)).resolves.toEqual(answer);
+    await expect(client.removeReminder(programmeId)).resolves.toEqual(answer);
+
+    const entry = entryId === undefined ? {} : { entry_id: entryId };
+    expect(sent).toEqual([
+      { type: 'tv_guide/reminders/add', programme_id: programmeId, language: 'pl', ...entry },
+      { type: 'tv_guide/reminders/add', programme_id: programmeId, language: 'pl', ...entry },
+      { type: 'tv_guide/reminders/list', ...entry },
+      { type: 'tv_guide/reminders/list', ...entry },
+      { type: 'tv_guide/reminders/remove', programme_id: programmeId, ...entry },
+      { type: 'tv_guide/reminders/remove', programme_id: programmeId, ...entry },
+    ]);
+  });
+
+  test('too_late is a known error code', async () => {
+    const client = new GuideClient({
+      sendMessagePromise: () => Promise.reject({ code: 'too_late', message: 'Too late' }),
+    } as never);
+    const request = client.addReminder('TVN|2026-10-19T17:50:00Z', 'pl');
+    await expect(request).rejects.toBeInstanceOf(GuideError);
+    await expect(request).rejects.toMatchObject({ code: 'too_late', message: 'Too late' });
   });
 
   test('maps server errors to GuideError codes', async () => {
