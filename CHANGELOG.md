@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.1 - 2026-10-20
+
+### Card
+
+- The card loads every time. Before, it showed as an error in about 2 of 3 page loads: Home Assistant replaces the browser's list of custom elements when its app starts, and the card was sometimes defined before that. The card now waits for the app.
+
 ## 0.1.0 - 2026-10-20
 
 First release.
