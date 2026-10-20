@@ -1,9 +1,9 @@
-import { describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import type { TvGuideConfig } from '../../src/config';
 import { fakty, mecz, zycie } from '../fixtures';
 import type { Programme } from '../../src/types/api';
 import { GuideError } from '../../src/data/guide-client';
-import { firstResult, matchChannels, SearchRunner, type SearchResults } from '../../src/data/search';
+import { firstResult, matchChannels, SEARCH_DELAY_MS, SearchRunner, type SearchResults } from '../../src/data/search';
 
 const polsat = { number: 3, name: 'Polsat', epg_id: 'Polsat' };
 const tvn = { number: 4, name: 'TVN', epg_id: 'TVN' };
@@ -31,8 +31,8 @@ const deferred = <T>() => {
   return { promise, resolve, reject };
 };
 
-/** Lets pending promise callbacks run. */
-const flush = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
+/** Lets the search delay pass and the pending promise callbacks run. */
+const flush = () => vi.advanceTimersByTimeAsync(SEARCH_DELAY_MS);
 
 const setup = (search: Search) => {
   const updates: SearchResults[] = [];
@@ -73,6 +73,9 @@ describe('matchChannels', () => {
 });
 
 describe('SearchRunner', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
   test('channels first, then now and later as they arrive', async () => {
     const now = deferred<Programme[]>();
     const later = deferred<Programme[]>();
@@ -111,6 +114,7 @@ describe('SearchRunner', () => {
     const { runner } = setup(search);
 
     runner.run('  Życie ', config);
+    vi.advanceTimersByTime(SEARCH_DELAY_MS);
     expect(search).toHaveBeenCalledTimes(2);
     expect(search).toHaveBeenCalledWith('zycie', ['TVP 1', 'Polsat', 'TVN'], 'now', 100);
     expect(search).toHaveBeenCalledWith('zycie', ['TVP 1', 'Polsat', 'TVN'], 'later', 40);
@@ -141,7 +145,9 @@ describe('SearchRunner', () => {
     const { runner, updates, last } = setup(search);
 
     runner.run('mec', config);
+    await flush();
     runner.run('mecz', config);
+    await flush();
     fresh.now.resolve([mecz]);
     fresh.later.resolve([]);
     await flush();
@@ -154,11 +160,55 @@ describe('SearchRunner', () => {
     expect(last()).toEqual({ query: 'mecz', channels: [], now: [mecz], later: [] });
   });
 
+  test('fast typing sends one search, for the last text', async () => {
+    const search = vi.fn<Search>(() => new Promise(() => {}));
+    const { runner } = setup(search);
+
+    runner.run('fa', config);
+    vi.advanceTimersByTime(SEARCH_DELAY_MS - 1);
+    runner.run('fak', config);
+    vi.advanceTimersByTime(SEARCH_DELAY_MS - 1);
+    runner.run('fakty', config);
+    expect(search).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(SEARCH_DELAY_MS);
+    expect(search.mock.calls.map(([query, , when]) => `${query} ${when}`)).toEqual(['fakty now', 'fakty later']);
+  });
+
+  test('channels show at once while the server steps wait', () => {
+    const search = vi.fn<Search>(() => new Promise(() => {}));
+    const { runner, last } = setup(search);
+
+    runner.run('Polsat', config);
+    expect(last()).toEqual({ query: 'polsat', channels: [polsat], now: null, later: null });
+    expect(search).not.toHaveBeenCalled();
+  });
+
+  test('a short text after a long one stops the waiting search', () => {
+    const search = vi.fn<Search>(() => new Promise(() => {}));
+    const { runner } = setup(search);
+
+    runner.run('fakty', config);
+    runner.run('f', config);
+    vi.advanceTimersByTime(SEARCH_DELAY_MS);
+    expect(search).not.toHaveBeenCalled();
+  });
+
+  test('cancel stops a waiting search', () => {
+    const search = vi.fn<Search>(() => new Promise(() => {}));
+    const { runner } = setup(search);
+
+    runner.run('fakty', config);
+    runner.cancel();
+    vi.advanceTimersByTime(SEARCH_DELAY_MS);
+    expect(search).not.toHaveBeenCalled();
+  });
+
   test('cancel stops all later updates', async () => {
     const now = deferred<Programme[]>();
     const { runner, updates } = setup(() => now.promise);
 
     runner.run('fakty', config);
+    vi.advanceTimersByTime(SEARCH_DELAY_MS);
     runner.cancel();
     now.resolve([fakty]);
     await flush();

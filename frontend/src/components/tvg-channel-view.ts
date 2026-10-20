@@ -7,13 +7,13 @@ import type { Programme } from '../types/api';
 import { fire } from './events';
 import { icon } from './icons';
 import './tvg-day-chips';
+import './tvg-loader';
 import './tvg-progress';
 import {
   BrokenPosters,
   overlapsDay,
   renderChannelTitle,
   renderCloseButton,
-  renderLoading,
   renderPoster,
   renderSwitchAction,
   viewStyles,
@@ -270,7 +270,7 @@ export class TvgChannelView extends LitElement {
   }
 
   private renderBody() {
-    if (this.loading) return renderLoading(this.t);
+    if (this.loading) return html`<tvg-loader .label=${this.t('loading')}></tvg-loader>`;
     if (this.error) return html`<p class="no-guide">${this.error}</p>`;
     if (!this.programmes.length) return html`<p class="no-guide">${this.t('noGuideLong')}</p>`;
     return this.renderSchedule();

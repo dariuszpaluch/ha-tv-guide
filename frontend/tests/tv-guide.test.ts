@@ -6,6 +6,7 @@ import type { Channel, Programme, Reminder, Reminders } from '../src/types/api';
 import type { HomeAssistant } from '../src/types/hass';
 import '../src/tv-guide';
 import { registerCard, TvGuide } from '../src/tv-guide';
+import { SEARCH_DELAY_MS } from '../src/data/search';
 
 vi.mock('../src/utils/logo-tone', () => ({ measureLogo: vi.fn(() => 'mixed') }));
 
@@ -45,6 +46,7 @@ const makeServer = () => {
     reminders: [] as Reminder[],
     phones: ['Pixel 8'],
     now: { Polsat: zycie, TVN: fakty } as Record<string, Programme | null>,
+    next: { Polsat: mecz, TVN: sport } as Record<string, Programme | null>,
     remindersAnswer: (): Reminders => ({ reminders: [...server.reminders], phones: server.phones }),
     send: vi.fn(async (message: Record<string, unknown>): Promise<unknown> => {
       if (server.fail && (server.failType === undefined || server.failType === message.type)) throw server.fail;
@@ -59,6 +61,8 @@ const makeServer = () => {
           return server.channels;
         case 'tv_guide/now':
           return server.now;
+        case 'tv_guide/next':
+          return server.next;
         case 'tv_guide/schedule': {
           const start = Date.parse(message.start as string);
           const end = Date.parse(message.end as string);
@@ -127,7 +131,11 @@ const mount = async (setup = makeHass(), config: unknown = CONFIG) => {
 
 const $ = <T extends Element>(root: ParentNode | null | undefined, selector: string) => root?.querySelector<T>(selector) ?? null;
 const $$ = <T extends Element>(root: ParentNode | null | undefined, selector: string) => [...(root?.querySelectorAll<T>(selector) ?? [])];
-const rows = (el: TvGuide) => $$<HTMLElement & { channel: { number: number }; programme: Programme | null; logo?: string }>(el.shadowRoot, 'tvg-channel-row');
+const rows = (el: TvGuide) =>
+  $$<HTMLElement & { channel: { number: number }; programme: Programme | null; next: Programme | null; logo?: string }>(
+    el.shadowRoot,
+    'tvg-channel-row',
+  );
 const rowOf = (el: TvGuide, number: number) => rows(el).find((row) => row.channel.number === number);
 const text = (el: TvGuide) => el.shadowRoot?.textContent?.replace(/\s+/g, ' ') ?? '';
 const isoRange = (key: string) => {
@@ -141,6 +149,7 @@ const typeQuery = async (el: TvGuide, query: string) => {
   if (!input) throw new Error('no search input');
   input.value = query;
   input.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+  await vi.advanceTimersByTimeAsync(SEARCH_DELAY_MS);
   await settle(el);
   return input;
 };
@@ -555,6 +564,23 @@ test('a new connection does not refresh while the card is disconnected', async (
   expect(second.server.requests('tv_guide/now')).toHaveLength(1);
 });
 
+test('fast typing sends one search, 250 ms after the last letter', async () => {
+  const { el, server } = await mount();
+  const input = $<HTMLInputElement>($(el.shadowRoot, 'tvg-search-box')?.shadowRoot, 'input');
+  for (const text of ['fa', 'fak', 'fakty']) {
+    if (input) input.value = text;
+    input?.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+    await vi.advanceTimersByTimeAsync(100);
+  }
+  expect(server.requests('tv_guide/search')).toHaveLength(0);
+  await vi.advanceTimersByTimeAsync(SEARCH_DELAY_MS);
+  await settle(el);
+  expect(server.requests('tv_guide/search').map((m) => `${String(m.query)} ${String(m.when)}`)).toEqual([
+    'fakty now',
+    'fakty later',
+  ]);
+});
+
 test('a failed search step says so instead of "no match"', async () => {
   const { el, server } = await mount();
   server.fail = { code: 'boom', message: 'boom' };
@@ -580,6 +606,34 @@ test('a blank query shows the normal list and a query without matches says so', 
   expect(text(el)).toContain('No channel or programme matches "zzz".');
   await typeQuery(el, '');
   expect(rows(el)).toHaveLength(3);
+});
+
+test('each row gets the programme after the one on now', async () => {
+  const { el, server } = await mount();
+  expect(server.requests('tv_guide/next')).toEqual([{ type: 'tv_guide/next', channel_ids: ['Polsat', 'TVN'] }]);
+  expect(rowOf(el, 3)?.next?.id).toBe(mecz.id);
+  expect(rowOf(el, 5)?.next?.id).toBe(sport.id);
+  expect(rowOf(el, 1)?.next).toBeNull();
+});
+
+test('a failed next request keeps the list working', async () => {
+  const setup = makeHass();
+  setup.server.fail = { code: 'unknown_error', message: 'boom' };
+  setup.server.failType = 'tv_guide/next';
+  const { el } = await mount(setup);
+  expect(rows(el)).toHaveLength(3);
+  expect(rowOf(el, 5)?.next).toBeNull();
+  expect(text(el)).not.toContain('Cannot load');
+});
+
+test('the TV loader shows in the list until the first answer', async () => {
+  const setup = makeHass();
+  setup.server.hold.add('tv_guide/now');
+  const { el } = await mount(setup);
+  expect($<HTMLElement & { label: string }>(el.shadowRoot, '.list tvg-loader')?.label).toBe('Loading…');
+  setup.server.release('tv_guide/now', () => true);
+  await settle(el);
+  expect($(el.shadowRoot, 'tvg-loader')).toBeNull();
 });
 
 test('shows a stale guide hint', async () => {

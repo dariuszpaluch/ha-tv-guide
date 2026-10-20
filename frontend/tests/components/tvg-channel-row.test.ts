@@ -1,6 +1,6 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import type { ChannelConfig } from '../../src/config';
-import { NOW, WAW, fakty, tEn, tPl } from '../fixtures';
+import { NOW, WAW, fakty, sport, tEn, tPl } from '../fixtures';
 import { TvgChannelRow } from '../../src/components/tvg-channel-row';
 
 vi.mock('../../src/utils/logo-tone', () => ({ measureLogo: vi.fn(() => 'mixed') }));
@@ -60,6 +60,30 @@ test('channel row shows the programme, its end time and the progress', async () 
   expect($(el, '.now .title')?.textContent).toBe('Fakty');
   expect($(el, '.now .tnum')?.textContent).toBe('19:35');
   expect($(el, 'tvg-progress')).not.toBeNull();
+});
+
+test('the next programme shows under the bar with its start time, and the end time moves there', async () => {
+  const el = await mount({ next: sport });
+  expect($(el, '.next .label')?.textContent).toBe('Next');
+  expect($(el, '.next .tnum')?.textContent).toBe('19:35');
+  expect($(el, '.next .title')?.textContent).toBe('Sport');
+  expect($(el, '.now .tnum')).toBeNull();
+});
+
+test('without a next programme there is no next line', async () => {
+  const el = await mount();
+  expect($(el, '.next')).toBeNull();
+});
+
+test('a next programme also shows when nothing is on now', async () => {
+  const el = await mount({ programme: null, next: sport });
+  expect($(el, '.now .title')?.textContent).toBe('No guide');
+  expect($(el, '.next .title')?.textContent).toBe('Sport');
+});
+
+test('the next label is translated', async () => {
+  const el = await mount({ next: sport, t: tPl });
+  expect($(el, '.next .label')?.textContent).toBe('Potem');
 });
 
 test('channel row without programme shows No guide', async () => {

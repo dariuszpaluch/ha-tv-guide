@@ -10,6 +10,7 @@
   "searching": "Szukam…",
   "loading": "Wczytuję…",
   "noMatch": "Brak kanałów i programów dla „{query}”.",
+  "next": "Potem",
   "noGuide": "Brak programu",
   "noGuideLong": "Brak programu dla tego kanału.",
   "notSelected": "Nie wybrany w integracji",

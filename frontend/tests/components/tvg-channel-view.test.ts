@@ -204,7 +204,7 @@ test('without programmes it says there is no guide', async () => {
 
 test('while loading it shows a loading row instead of the "no guide" text', async () => {
   const el = await mount({ programmes: [], days: [], loading: true });
-  expect($(el, '.loading')?.textContent?.trim()).toBe('Loading…');
+  expect($<HTMLElement & { label: string }>(el, 'tvg-loader')?.label).toBe('Loading…');
   expect($(el, '.no-guide')).toBeNull();
 });
 

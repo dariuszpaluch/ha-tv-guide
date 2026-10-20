@@ -189,6 +189,26 @@ export const rowStyles = [
     tvg-progress {
       margin-top: 3px;
     }
+    .next {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+      margin-top: 2px;
+      color: var(--secondary-text-color);
+      font-size: 12.5px;
+      white-space: nowrap;
+    }
+    .next .label {
+      font-size: 10.5px;
+      font-weight: 500;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .next .title {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
     .chev {
       color: var(--disabled-text-color);
     }

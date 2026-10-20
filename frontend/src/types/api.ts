@@ -51,6 +51,9 @@ export interface Reminders {
 /** Answer of `tv_guide/now`: a channel without a programme on air has `null`. */
 export type NowMap = Record<string, Programme | null>;
 
+/** Answer of `tv_guide/next`: a channel without a later programme has `null`. */
+export type NextMap = Record<string, Programme | null>;
+
 export type SearchWhen = 'now' | 'later';
 
 export type GuideErrorCode = 'not_found' | 'not_loaded' | 'invalid_format' | 'too_late';

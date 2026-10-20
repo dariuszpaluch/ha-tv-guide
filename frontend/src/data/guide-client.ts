@@ -1,4 +1,4 @@
-import type { Channel, GuideErrorCode, GuideInfo, NowMap, Programme, Reminders, SearchWhen } from '../types/api';
+import type { Channel, GuideErrorCode, GuideInfo, NextMap, NowMap, Programme, Reminders, SearchWhen } from '../types/api';
 import type { HomeAssistant } from '../types/hass';
 
 type Connection = Pick<HomeAssistant['connection'], 'sendMessagePromise'>;
@@ -75,6 +75,11 @@ export class GuideClient {
     const key = `now:${JSON.stringify([...channelIds].sort())}`;
     const load = () => this.send<NowMap>('tv_guide/now', { channel_ids: channelIds });
     return options.force ? this.store(key, NOW_TTL, load) : this.cached(key, NOW_TTL, load);
+  }
+
+  /** The first programme after now for each channel. Never cached: the card asks on every refresh. */
+  next(channelIds: string[]): Promise<NextMap> {
+    return this.send<NextMap>('tv_guide/next', { channel_ids: channelIds });
   }
 
   /** Programmes of one channel that overlap `[start, end)`. Times are in ms. Cached for 10 min. */
