@@ -1,39 +1,66 @@
 # Agent instructions
 
-TV guide for Home Assistant: a custom integration (`custom_components/tv_guide`, Python) and a Lovelace card (`frontend/`, TypeScript + Lit) in one repository. One HACS install gives both: the integration serves the built card.
+You work on **TV guide**, an add-on for [Home Assistant](https://www.home-assistant.io) (HA). This file gives you the background you need when you start with no context.
+
+## Background
+
+- **Home Assistant** is an open-source home automation server, written in Python with `asyncio`. An **integration** is a Python package that adds a feature. Custom integrations live in `custom_components/<domain>/`. A user adds an integration in the UI (a **config entry**, set up by a **config flow**).
+- **Dashboards** (also called Lovelace) show **cards**. A custom card is a web component in a JS file that the browser loads. Users write the card config in YAML.
+- **HACS** is the community store for HA. It installs this repository from the `tv_guide.zip` of a GitHub release.
+- **XMLTV** is a common XML format for TV guides. The integration reads it. A typical source is [epg.ovh](https://epg.ovh/pl.gz) (Poland, about 100 MB of XML after unpacking).
+
+## What this repository is
+
+Two parts, one HACS install:
+
+- **Integration `tv_guide`** (`custom_components/tv_guide/`, Python). It runs on the HA server. It downloads the guide, keeps the selected channels, stores the last good guide on disk, answers WebSocket commands and serves resized posters.
+- **Card `custom:tv-guide`** (`frontend/`, TypeScript and Lit). It runs in the browser or the HA mobile app. It shows the guide and switches the channel with an HA action from its config.
+
+The parts talk only through the contract in [docs/api.md](docs/api.md): WebSocket commands `tv_guide/*` and the poster URL `/api/tv_guide/image/...`. The integration also serves the built card, so users add no Lovelace resource.
 
 Read before you change anything:
 
-- [docs/design.md](docs/design.md): what it does and why.
+- [docs/design.md](docs/design.md): how it works, why, and what each file does.
 - [docs/api.md](docs/api.md): the contract between the integration and the card.
-- [docs/superpowers/plans/](docs/superpowers/plans/): the work plan and who does which task.
+- [CONTRIBUTING.md](CONTRIBUTING.md): commands, rules, hard cases to test, how to release. Its rules apply to you.
+- [README.md](README.md): what users see and configure.
 
-## Structure
+## Versions and gotchas
 
-```
-custom_components/tv_guide/   integration
-  frontend/tv-guide.js        built card (build output, not in git)
-tests/                        pytest tests of the integration
-frontend/                     card source, Vite, Vitest
-docs/                         design, API contract, plans, mockup
-```
+- HA **2026.10** or newer, Python **3.14**. The tests pin HA with `pytest-homeassistant-custom-component` in `pyproject.toml`.
+- Schemas use **`probatio`**, as HA core does. Do not import `voluptuous`.
+- No new packages in `manifest.json` `requirements`. Use the standard library and what HA core ships: `aiohttp`, `yarl`, `Pillow`, `probatio`.
+- Never block the event loop. Parsing, decompressing, Pillow and file I/O run in `hass.async_add_executor_job`. HA logs a warning for blocking calls.
+- The guide is large. Parse it as a stream and keep only the selected channels. Never read the whole XML into memory.
+- Times: the guide has offsets that change at night when the clocks change. Keep times aware of the time zone. The card uses the time zone and time format of the HA profile.
+- `custom_components/tv_guide/frontend/` is build output and is not in git. Without it, the integration starts and logs a warning.
+- The card URL carries the integration version from `manifest.json`. The release workflow sets it from the git tag.
 
-## Rules
+## Testing
 
-- **Contract first.** `docs/api.md` is the only source for the WebSocket and HTTP API. Do not change the API in code without changing `docs/api.md` first, in its own commit. If a task needs a change, stop and report it.
-- **Tests with every change.** Write the failing test first, then the code. Run the whole test suite of the part you changed before each commit.
-- **Python:** type hints everywhere, docstrings on public functions, `async` for I/O, blocking work (parsing, Pillow) in `hass.async_add_executor_job`. No extra package in `manifest.json` `requirements`: use what Home Assistant core already has.
-- **TypeScript:** `strict: true`, no `any`. Derive types from the contract types in `frontend/src/types/api.ts`. Semicolons, `const`, arrow functions, early returns. JSDoc on all functions.
-- **Card look:** only HA theme variables (`--primary-color`, `--card-background-color`, ...), no fixed colours except the logo tiles. Every user-visible string goes through `t()` and exists in `en.ts` and `pl.ts`.
-- **Comments and docs:** plain English, short sentences, active voice. Explain why, not what.
-- **Commits:** conventional commits (`feat:`, `fix:`, `test:`, `refactor:`, `docs:`, `chore:`). No `Co-Authored-By` trailer. Never amend or squash.
+You do not need a running Home Assistant.
 
-## Commands
+- The integration tests use the `hass` fixture of `pytest-homeassistant-custom-component`. The shared test data is in `tests/conftest.py` and `tests/fixtures/`.
+- The card tests use Vitest with happy-dom. The shared guide data is in `frontend/src/test/fixtures.ts`. `frontend/src/tv-guide.test.ts` builds a fake `hass` object with a fake server (`makeHass`).
+- The test clock is 2026-10-19 19:20 in `Europe/Warsaw`.
 
-| What | Command |
+## Where to start
+
+| Task | Files |
 | --- | --- |
-| Integration tests | `uv run pytest` |
-| Integration lint | `uv run ruff check . && uv run ruff format --check .` |
-| Card tests | `cd frontend && pnpm test` |
-| Card type check and lint | `cd frontend && pnpm check` |
-| Build the card | `cd frontend && pnpm build` (writes `custom_components/tv_guide/frontend/tv-guide.js`) |
+| Guide parsing | `parser.py`, `model.py`, `tests/test_parser.py` |
+| Download and storage | `source.py`, `coordinator.py`, `store.py` |
+| Search, schedule, airings | `search.py` (server), `frontend/src/data/search.ts` (card steps) |
+| A WebSocket command | `docs/api.md` first, then `websocket_api.py` and `frontend/src/types/api.ts` |
+| Posters | `images.py` |
+| Setup screens | `config_flow.py`, `strings.json`, `translations/` |
+| Card config | `frontend/src/config.ts`, `README.md`, `examples/card.yaml` |
+| Card look | `frontend/src/components/`, `frontend/src/tv-guide-styles.ts` |
+| A visible string | `frontend/src/i18n/en.ts` and `pl.ts` |
+
+## Extra rules for agents
+
+- **API changes.** If a task needs a change to `docs/api.md`, stop and report it. Do not change the contract on your own.
+- **Commits.** Conventional commits. No `Co-Authored-By` trailer. Never amend or squash.
+- **User docs.** A change that users can see also updates `README.md` and `CHANGELOG.md`.
+- **Language.** Code, comments and docs are in English. The card has English and Polish strings.
