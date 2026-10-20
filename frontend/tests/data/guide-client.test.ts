@@ -77,6 +77,17 @@ describe('GuideClient', () => {
     expect(sent).toHaveLength(2);
   });
 
+  test('next sends the channel ids and is never cached', async () => {
+    const { connection, sent } = fakeConnection(() => ({ TVN: fakty }));
+    const client = new GuideClient(connection, undefined, clock);
+    expect(await client.next(['TVN'])).toEqual({ TVN: fakty });
+    await client.next(['TVN']);
+    expect(sent).toEqual([
+      { type: 'tv_guide/next', channel_ids: ['TVN'] },
+      { type: 'tv_guide/next', channel_ids: ['TVN'] },
+    ]);
+  });
+
   test('schedule sends UTC ISO times and caches per channel and range for 10 min', async () => {
     const { connection, sent } = fakeConnection(() => [fakty]);
     const client = new GuideClient(connection, undefined, clock);

@@ -114,7 +114,7 @@ The card shows a bell in programme details only when the start is more than 5 mi
 | --- | --- |
 | `loader.ts` | Entry of the built file. It waits until HA defines `home-assistant`, then loads the card. HA replaces `window.customElements` with a polyfill when its app starts, and elements defined before that are lost. |
 | `tv-guide.ts` | The root card: config, refresh every 60 seconds, list, search and the sheet. |
-| `components/` | Lit elements: rows, day chips, the sheet and its two views, the search box. |
+| `components/` | Lit elements: rows, day chips, the sheet and its two views, the search box, the TV loader. |
 | `controllers/` | The swipe controller for the sheet gestures. |
 | `data/` | Pure functions: guide client, search steps, time and TV day, stale check, logos. |
 | `i18n.ts` | `t()`: picks the language and fills in the placeholders. The texts are in `frontend/i18n/` (`en.json`, `pl.json`, and `qqq.json` with notes for translators). |
@@ -123,14 +123,15 @@ The card shows a bell in programme details only when the start is more than 5 mi
 
 ### Behaviour
 
-- **List row with two tap areas.** The left area (number and logo) switches the channel. The right area (name, programme on now, progress bar, `›`) opens the channel details.
+- **List row with two tap areas.** The left area (number and logo) switches the channel. The right area (name, programme on now, progress bar, the next programme with its start time, `›`) opens the channel details. The end time of the programme on now shows only when there is no next programme: the next start time says the same.
+- **Loading.** The channel list and a channel schedule show a TV with antenna waves in the middle while they load. Search keeps a small line per step, because its results arrive one step at a time.
 - **Details sheet with two views.** The sheet is a native `<dialog>` opened with `showModal()`. The browser shows it above the whole page, so the card and the HA layout cannot clip it. On a phone it fills the screen; on a bigger screen it is a centered dialog.
   - Channel view: day chips, then the schedule for that day. Each programme has a small poster. The programme on now has a bigger poster, two lines of description and a progress bar. The list scrolls to the open programme, or on today to the programme on now. One programme stays above it, so the user sees what came before. A tap on a visible row does not move the list.
   - Programme view: poster, title, time, time left or start time, category, age rating, year, country, star rating, description and a switch button. It slides over the channel view.
 - **More airings** below the description: other airings of programmes with the same title, soonest first. First on the same channel, then on the other channels of the card. Each group shows 3 airings and "Show all (N)", because a daily series can have more than 20. Programmes shorter than 15 minutes have no "More airings": their titles ("Pogoda", "Sport") match unrelated programmes on other channels.
 - **Gestures.** Swipe right on the programme view to go back. Drag the grab bar or a header down to close the sheet. A drag is never also a tap.
 - **TV day.** A TV day runs from 05:00 to 05:00 by default, like printed TV guides (`tv_day_starts_at`). There is no "yesterday": a cable box cannot play past programmes. On the night the clocks change, a TV day is 23 or 25 hours long.
-- **Search in three steps.** Each step shows when it is ready, and a newer query cancels an older one:
+- **Search in three steps.** Each step shows when it is ready, and a newer query cancels an older one. The channels show at once. The two server steps wait 250 ms after the last letter, so fast typing sends one search:
   1. channels (name or number),
   2. programmes on now,
   3. later programmes, soonest first, all days in the guide, one result per channel and title.

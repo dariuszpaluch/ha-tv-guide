@@ -10,6 +10,7 @@
   "searching": "Searching…",
   "loading": "Loading…",
   "noMatch": "No channel or programme matches \"{query}\".",
+  "next": "Next",
   "noGuide": "No guide",
   "noGuideLong": "No programme guide for this channel.",
   "notSelected": "Not selected in the integration",

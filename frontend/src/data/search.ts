@@ -21,6 +21,8 @@ const PROGRAMME_SEARCH_MIN = 2;
 const LATER_LIMIT = 40;
 /** The most the server allows. A name that matches on many channels must not be cut. */
 const NOW_LIMIT = 100;
+/** The server steps wait this long after the last change, so fast typing sends one search, not one per letter. */
+export const SEARCH_DELAY_MS = 250;
 
 const configChannels = (config: TvGuideConfig): ChannelConfig[] => config.sections.flatMap((section) => section.channels);
 
@@ -37,11 +39,13 @@ export const matchChannels = (channels: ChannelConfig[], query: string): Channel
 };
 
 /**
- * Runs the three search steps. Channels are ready at once; the two server steps update on their own.
- * A newer `run` or `cancel` makes every older answer stale, and stale answers never reach `onUpdate`.
+ * Runs the three search steps. Channels are ready at once; the two server steps start after `SEARCH_DELAY_MS`
+ * and update on their own. A newer `run` or `cancel` stops a waiting search and makes every older answer stale;
+ * stale answers never reach `onUpdate`.
  */
 export class SearchRunner {
   private runId = 0;
+  private timer?: ReturnType<typeof setTimeout>;
 
   /**
    * @param search The `search` method of the guide client.
@@ -53,12 +57,13 @@ export class SearchRunner {
   ) {}
 
   /**
-   * Starts a search and cancels the previous one.
+   * Starts a search and cancels the previous one. The server steps wait `SEARCH_DELAY_MS`.
    * Below 2 characters the server is not called and `now` and `later` are `[]`.
    * @param query Text typed by the user.
    * @param config Validated card config.
    */
   run(query: string, config: TvGuideConfig): void {
+    clearTimeout(this.timer);
     const runId = ++this.runId;
     const text = normalize(query);
     let results: SearchResults = { query: text, channels: matchChannels(configChannels(config), text), now: null, later: null };
@@ -81,12 +86,15 @@ export class SearchRunner {
         (error: unknown) => finish({ [key]: [], error: errorCode(error) }),
       );
     };
-    step('now', this.search(text, ids, 'now', NOW_LIMIT));
-    step('later', this.search(text, ids, 'later', LATER_LIMIT));
+    this.timer = setTimeout(() => {
+      step('now', this.search(text, ids, 'now', NOW_LIMIT));
+      step('later', this.search(text, ids, 'later', LATER_LIMIT));
+    }, SEARCH_DELAY_MS);
   }
 
-  /** Makes the running search stale. Its answers are ignored. */
+  /** Stops a waiting search and makes the running one stale. Its answers are ignored. */
   cancel(): void {
+    clearTimeout(this.timer);
     this.runId++;
   }
 }

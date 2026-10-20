@@ -11,6 +11,7 @@
   "searching": "Shows while a search step is still running.",
   "loading": "Shows while the channel list or the schedule of a day is loading.",
   "noMatch": "Shows when a search finds nothing. {query} is the text the user typed.",
+  "next": "Small label in the channel list, before the start time and title of the programme after the one on now. Shown in capital letters, so keep it short.",
   "noGuide": "Short text in a channel row when the guide has no programmes for the channel.",
   "noGuideLong": "Text in the channel details when the guide has no programmes for the channel.",
   "notSelected": "Short text in a channel row when the channel is in the card, but not selected in the integration.",

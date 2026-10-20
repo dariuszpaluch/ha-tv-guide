@@ -24,6 +24,18 @@ async def test_now(ws, loaded_entry) -> None:
     assert msg["result"]["Nope"] is None
 
 
+async def test_next(ws, loaded_entry) -> None:
+    msg = await call(ws, "next", channel_ids=["TVN", "Nope"])
+    assert msg["result"]["TVN"]["title"] == "Sport"
+    assert msg["result"]["TVN"]["start"] == "2026-10-19T19:35:00+02:00"
+    assert msg["result"]["Nope"] is None
+
+
+async def test_next_needs_channel_ids(ws, loaded_entry) -> None:
+    msg = await call(ws, "next")
+    assert msg["error"]["code"] == "invalid_format"
+
+
 async def test_schedule(ws, loaded_entry) -> None:
     msg = await call(ws, "schedule", channel_id="TVN", start="2026-10-19T17:30:00Z", end="2026-10-20T03:00:00Z")
     assert [p["title"] for p in msg["result"]] == ["Fakty", "Sport", "Info"]

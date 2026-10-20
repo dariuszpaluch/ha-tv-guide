@@ -113,6 +113,11 @@ Input: none. Output: `Channel[]` of the selected channels, sorted by name.
 Input: `channel_ids: string[]`.
 Output: `{ "<channel_id>": Programme | null }`: the programme on air now (`start <= now < stop`). A channel id that is not in the guide is in the output with `null`.
 
+### `tv_guide/next`
+
+Input: `channel_ids: string[]`.
+Output: `{ "<channel_id>": Programme | null }`: the first programme that starts after now (`start > now`). `null` when the guide has no later programme on the channel. A channel id that is not in the guide is in the output with `null`.
+
 ### `tv_guide/schedule`
 
 Input: `channel_id: string`, `start: string`, `end: string`.

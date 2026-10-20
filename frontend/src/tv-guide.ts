@@ -2,6 +2,7 @@ import { LitElement, html, nothing, type TemplateResult } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import './components/tvg-channel-row';
 import './components/tvg-channel-view';
+import './components/tvg-loader';
 import './components/tvg-programme-row';
 import './components/tvg-programme-view';
 import './components/tvg-search-box';
@@ -25,7 +26,7 @@ import { formatLastSuccess, isStale } from './data/stale';
 import { overlapsDay } from './components/view-parts';
 import { hour12, timeZoneOf, tvDayKey, tvDayRange, tvDays } from './data/time';
 import { localeOf, resolveLanguage, translator, type Translate } from './i18n';
-import type { GuideErrorCode, GuideInfo, NowMap, Programme, Reminders } from './types/api';
+import type { GuideErrorCode, GuideInfo, NextMap, NowMap, Programme, Reminders } from './types/api';
 import type { HomeAssistant } from './types/hass';
 import { tvGuideStyles } from './tv-guide-styles';
 
@@ -88,6 +89,8 @@ export class TvGuide extends LitElement {
   @state() private config?: TvGuideConfig;
   @state() private info?: GuideInfo;
   @state() private nowMap?: NowMap;
+  /** What comes after the programme on now. A failed load keeps the old value. */
+  @state() private nextMap?: NextMap;
   @state() private entries = new Map<string, ChannelEntry>();
   @state() private loadError?: LoadError;
   /** Current time in ms. It changes with each refresh, so the whole card shows one moment. */
@@ -133,6 +136,7 @@ export class TvGuide extends LitElement {
     this.runner = undefined;
     this.info = undefined;
     this.nowMap = undefined;
+    this.nextMap = undefined;
     this.loadError = undefined;
     this.icons = new Map();
     this.keptIds = undefined;
@@ -244,6 +248,15 @@ export class TvGuide extends LitElement {
       },
       () => undefined,
     );
+    // The next programme is extra too: without it the list still works.
+    if (ids.length > 0) {
+      client.next(ids).then(
+        (nextMap) => {
+          if (run === this.refreshRun && client === this.client) this.nextMap = nextMap;
+        },
+        () => undefined,
+      );
+    }
     try {
       const [info, guideChannels, nowMap] = await Promise.all([
         client.info(),
@@ -574,7 +587,7 @@ export class TvGuide extends LitElement {
   /** The channel list, the search results, or a message when the guide cannot be shown. */
   private renderList(t: Translate): TemplateResult {
     if (this.loadError && !this.nowMap) return html`<div class="empty">${t(loadErrorKey(this.loadError))}</div>`;
-    if (!this.nowMap) return html`<div class="searching"><span class="spinner"></span>${t('loading')}</div>`;
+    if (!this.nowMap) return html`<tvg-loader .label=${t('loading')}></tvg-loader>`;
     const { results } = this;
     if (results && results.query !== '') return this.renderResults(results, t);
     return html`${this.config?.sections.map(
@@ -593,6 +606,7 @@ export class TvGuide extends LitElement {
       .channel=${channel}
       .logo=${logoOf(channel, this.icons)}
       .programme=${(channel.epg_id === undefined ? undefined : this.nowMap?.[channel.epg_id]) ?? null}
+      .next=${(channel.epg_id === undefined ? undefined : this.nextMap?.[channel.epg_id]) ?? null}
       .notSelected=${notSelected(channel, this.keptIds)}
       .now=${this.nowMs}
       .t=${t}

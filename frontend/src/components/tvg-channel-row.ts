@@ -1,4 +1,4 @@
-import { LitElement, html } from 'lit';
+import { LitElement, html, nothing } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import type { ChannelConfig } from '../config';
 import { formatTime, progress } from '../data/time';
@@ -9,13 +9,18 @@ import { highlighted } from './highlighted';
 import { renderChevron, renderZap, rowStyles } from './row-parts';
 import './tvg-progress';
 
-/** A channel in the list: number and logo on the left (switch), name and programme on now on the right (details). */
+/**
+ * A channel in the list: number and logo on the left (switch), and on the right (details) the name,
+ * the programme on now and the one after it.
+ */
 @customElement('tvg-channel-row')
 export class TvgChannelRow extends LitElement {
   @property({ attribute: false }) channel!: ChannelConfig;
   /** Logo URL, already chosen by the parent: the config logo, or else the guide icon. */
   @property({ attribute: false }) logo?: string;
   @property({ attribute: false }) programme: Programme | null = null;
+  /** The programme after the one on now. */
+  @property({ attribute: false }) next: Programme | null = null;
   /** The integration does not keep this channel's guide id. */
   @property({ attribute: false }) notSelected = false;
   /** Current time, in milliseconds. */
@@ -36,15 +41,27 @@ export class TvgChannelRow extends LitElement {
 
   static styles = rowStyles;
 
+  private time(iso: string): string {
+    return formatTime(Date.parse(iso), this.locale, this.timeZone, this.hour12);
+  }
+
+  /** The end time shows here only without a next programme: the "next" line has the same time. */
   private renderProgramme(programme: Programme) {
-    const stop = Date.parse(programme.stop);
     return html`
       <span class="now">
         <span class="title">${programme.title}</span>
-        <span class="tnum">${formatTime(stop, this.locale, this.timeZone, this.hour12)}</span>
+        ${this.next ? nothing : html`<span class="tnum">${this.time(programme.stop)}</span>`}
       </span>
       <tvg-progress .value=${progress(programme, this.now)}></tvg-progress>
     `;
+  }
+
+  private renderNext(next: Programme) {
+    return html`<span class="next">
+      <span class="label">${this.t('next')}</span>
+      <span class="tnum">${this.time(next.start)}</span>
+      <span class="title">${next.title}</span>
+    </span>`;
   }
 
   protected render() {
@@ -61,6 +78,7 @@ export class TvgChannelRow extends LitElement {
           ${this.programme
             ? this.renderProgramme(this.programme)
             : html`<span class="now"><span class="title">${t(this.notSelected ? 'notSelected' : 'noGuide')}</span></span>`}
+          ${this.next ? this.renderNext(this.next) : nothing}
         </span>
         ${renderChevron()}
       </button>
