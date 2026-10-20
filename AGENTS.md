@@ -53,10 +53,10 @@ You do not need a running Home Assistant.
 | Search, schedule, airings | `search.py` (server), `frontend/src/data/search.ts` (card steps) |
 | A WebSocket command | `docs/api.md` first, then `websocket_api.py` and `frontend/src/types/api.ts` |
 | Posters | `images.py` |
-| Setup screens | `config_flow.py`, `strings.json`, `translations/` |
+| Setup screens | `config_flow.py`, `translations/` (`en.json`, `pl.json`, `qqq.json`) |
 | Card config | `frontend/src/config.ts`, `README.md`, `examples/card.yaml` |
 | Card look | `frontend/src/components/`, `frontend/src/tv-guide-styles.ts` |
-| A visible string | `frontend/src/i18n/en.ts` and `pl.ts` |
+| A visible text in the card | `frontend/i18n/` (`en.json`, `pl.json`, `qqq.json`), read by `frontend/src/i18n.ts` |
 
 ## Extra rules for agents
 
