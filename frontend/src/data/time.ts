@@ -16,21 +16,37 @@ interface WallClock {
   minute: number;
 }
 
+/** Building a formatter is slow (about 0.1 ms) and a schedule asks for hundreds of TV day keys, so one per zone is kept. */
+const wallClockFormats = new Map<string, Intl.DateTimeFormat>();
+
+/**
+ * The formatter that gives the wall-clock parts in a time zone.
+ * @param timeZone IANA time zone name.
+ */
+const wallClockFormat = (timeZone: string): Intl.DateTimeFormat => {
+  let format = wallClockFormats.get(timeZone);
+  if (!format) {
+    format = new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      hourCycle: 'h23',
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: 'numeric',
+    });
+    wallClockFormats.set(timeZone, format);
+  }
+  return format;
+};
+
 /**
  * Wall-clock date and time of an instant in a time zone.
  * @param ms Instant in milliseconds since the epoch.
  * @param timeZone IANA time zone name.
  */
 const wallClock = (ms: number, timeZone: string): WallClock => {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone,
-    hourCycle: 'h23',
-    year: 'numeric',
-    month: 'numeric',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: 'numeric',
-  }).formatToParts(ms);
+  const parts = wallClockFormat(timeZone).formatToParts(ms);
   const part = (type: Intl.DateTimeFormatPartTypes): number => Number(parts.find((p) => p.type === type)?.value);
   return { year: part('year'), month: part('month'), day: part('day'), hour: part('hour'), minute: part('minute') };
 };
@@ -47,16 +63,17 @@ const addDays = (key: string, days: number): string => dateKey(new Date(Date.par
 
 /**
  * TV day of an instant. A TV day starts at `startHour` local time, so a programme after midnight belongs to the evening before.
- * The check uses the wall clock, not "minus N hours", because a DST change inside those hours would give the wrong day.
+ * The answer comes from `tvDayRange`, not from "minus N hours" or from the wall-clock hour: when the clocks change inside
+ * those hours, only the range knows which of two equal wall-clock times starts the day.
  * @param ms Instant in milliseconds since the epoch.
  * @param timeZone IANA time zone name.
  * @param startHour Local hour at which a TV day starts.
  * @returns Day key, `YYYY-MM-DD`.
  */
 export const tvDayKey = (ms: number, timeZone: string, startHour: number): string => {
-  const { year, month, day, hour } = wallClock(ms, timeZone);
-  const key = dateKey(new Date(Date.UTC(year, month - 1, day)));
-  return hour < startHour ? addDays(key, -1) : key;
+  const { year, month, day } = wallClock(ms, timeZone);
+  const calendarDay = dateKey(new Date(Date.UTC(year, month - 1, day)));
+  return ms < tvDayRange(calendarDay, timeZone, startHour).start ? addDays(calendarDay, -1) : calendarDay;
 };
 
 /**

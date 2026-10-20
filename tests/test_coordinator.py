@@ -1,10 +1,13 @@
 import gzip
+import io
 from datetime import timedelta
 
 from homeassistant.config_entries import ConfigEntryState
 from pytest_homeassistant_custom_component.common import async_fire_time_changed
 
 from custom_components.tv_guide.coordinator import TvGuideCoordinator
+from custom_components.tv_guide.model import Guide
+from custom_components.tv_guide.parser import parse_guide
 from custom_components.tv_guide.store import GuideStore
 from tests.conftest import NOW, URL
 
@@ -54,12 +57,71 @@ async def test_periodic_update(hass, loaded_entry, aioclient_mock, freezer) -> N
     assert aioclient_mock.call_count == calls + 1
 
 
-async def test_stored_guide_dropped_when_channels_differ(hass, mock_entry, guide) -> None:
+def _stored_for(guide_xml: bytes, *channel_ids: str) -> Guide:
+    """The fixture source parsed for these channels only, as an older selection would have stored it."""
+    return parse_guide(io.BytesIO(guide_xml), set(channel_ids), NOW)
+
+
+async def test_stored_guide_is_cut_to_a_smaller_selection(hass, mock_entry, guide) -> None:
     await GuideStore(hass, mock_entry.entry_id).async_save(guide)
     hass.config_entries.async_update_entry(mock_entry, options={**mock_entry.options, "channels": ["TVN"]})
     coordinator = TvGuideCoordinator(hass, mock_entry)
+    assert await coordinator.async_load_stored() is True
+    assert set(coordinator.data.channels) == {"TVN"}
+    assert set(coordinator.data.programmes) == {"TVN"}
+    assert coordinator.data.programmes["TVN"] == guide.programmes["TVN"]
+    assert coordinator.last_success == guide.fetched_at
+
+
+async def test_stored_guide_gets_an_empty_channel_for_a_new_selection(hass, mock_entry, guide_xml) -> None:
+    await GuideStore(hass, mock_entry.entry_id).async_save(_stored_for(guide_xml, "TVN"))
+    coordinator = TvGuideCoordinator(hass, mock_entry)
+    assert await coordinator.async_load_stored() is True
+    assert set(coordinator.data.channels) == {"TVN", "Polsat"}
+    assert coordinator.data.channels["Polsat"].name == "Polsat"
+    assert coordinator.data.programmes["TVN"]
+    assert coordinator.data.programmes["Polsat"] == []
+
+
+async def test_stored_guide_is_not_used_without_a_common_channel(hass, mock_entry, guide_xml) -> None:
+    await GuideStore(hass, mock_entry.entry_id).async_save(_stored_for(guide_xml, "TVN"))
+    hass.config_entries.async_update_entry(mock_entry, options={**mock_entry.options, "channels": ["Polsat"]})
+    coordinator = TvGuideCoordinator(hass, mock_entry)
     assert await coordinator.async_load_stored() is False
     assert coordinator.data is None
+
+
+async def test_added_channel_keeps_the_old_ones_while_the_source_is_down(
+    hass, aioclient_mock, mock_entry, guide_xml
+) -> None:
+    await GuideStore(hass, mock_entry.entry_id).async_save(_stored_for(guide_xml, "TVN"))
+    aioclient_mock.get(URL, status=503)
+    await hass.config_entries.async_setup(mock_entry.entry_id)
+    await hass.async_block_till_done()
+    assert mock_entry.state is ConfigEntryState.LOADED
+    data = mock_entry.runtime_data.data
+    assert data.programmes["TVN"]
+    assert data.programmes["Polsat"] == []
+
+
+async def test_added_channel_gets_programmes_after_the_background_refresh(
+    hass, aioclient_mock, mock_entry, guide_xml
+) -> None:
+    await GuideStore(hass, mock_entry.entry_id).async_save(_stored_for(guide_xml, "TVN"))
+    aioclient_mock.get(URL, content=guide_xml)
+    await hass.config_entries.async_setup(mock_entry.entry_id)
+    await hass.async_block_till_done()
+    assert mock_entry.runtime_data.data.programmes["Polsat"]
+
+
+async def test_setup_waits_for_the_source_when_no_stored_channel_is_selected(
+    hass, aioclient_mock, mock_entry, guide_xml
+) -> None:
+    await GuideStore(hass, mock_entry.entry_id).async_save(_stored_for(guide_xml, "TVN"))
+    hass.config_entries.async_update_entry(mock_entry, options={**mock_entry.options, "channels": ["Polsat"]})
+    aioclient_mock.get(URL, status=503)
+    await hass.config_entries.async_setup(mock_entry.entry_id)
+    assert mock_entry.state is ConfigEntryState.SETUP_RETRY
 
 
 async def test_setup_retries_when_source_down(hass, aioclient_mock, mock_entry) -> None:

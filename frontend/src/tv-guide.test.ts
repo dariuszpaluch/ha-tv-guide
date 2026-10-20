@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { validateConfig } from './config';
 import { tvDayRange } from './data/time';
 import { NOW, WAW, channels, fakty, faktyDay3, faktyPolsat, faktyTomorrow, mecz, sport, uwagaTomorrow, zycie } from './test/fixtures';
-import type { Programme } from './types/api';
+import type { Channel, Programme } from './types/api';
 import type { HomeAssistant } from './types/hass';
 import './tv-guide';
 import { registerCard, TvGuide } from './tv-guide';
@@ -37,6 +37,7 @@ const makeServer = () => {
     /** Message types whose answers wait for `release`. */
     hold: new Set<string>(),
     held: [] as { message: Record<string, unknown>; resolve: (answer?: unknown) => void }[],
+    channels: channels as Channel[],
     info: { last_success: '2026-10-19T18:00:00+02:00', update_interval: 12 },
     search: { now: [fakty] as Programme[], later: [faktyPolsat] as Programme[] },
     airings: [] as Programme[],
@@ -52,7 +53,7 @@ const makeServer = () => {
         case 'tv_guide/info':
           return server.info;
         case 'tv_guide/channels':
-          return channels;
+          return server.channels;
         case 'tv_guide/now':
           return server.now;
         case 'tv_guide/schedule': {
@@ -154,13 +155,13 @@ test('a row uses the guide icon, and the config logo when there is one', async (
   expect(rowOf(el, 1)?.logo).toBeUndefined();
 });
 
-test('asks for the channels once and for now every 60 seconds', async () => {
+test('asks for the channels and for now every 60 seconds', async () => {
   const { el, server } = await mount();
   expect(server.requests('tv_guide/channels')).toHaveLength(1);
   expect(server.requests('tv_guide/now')).toHaveLength(1);
   await vi.advanceTimersByTimeAsync(60 * 1000);
   await settle(el);
-  expect(server.requests('tv_guide/channels')).toHaveLength(1);
+  expect(server.requests('tv_guide/channels')).toHaveLength(2);
   expect(server.requests('tv_guide/now')).toHaveLength(2);
 });
 
@@ -173,7 +174,7 @@ test('tvg-switch calls the switch action and marks the row for 1.6 seconds', asy
   const { el, callService } = await mount();
   $<HTMLElement>(rowOf(el, 3)?.shadowRoot, '.zap')?.click();
   await settle(el);
-  expect(callService).toHaveBeenCalledWith('script', 'cable_box_go_to_channel', { channel: 3 });
+  expect(callService).toHaveBeenCalledWith('script', 'cable_box_go_to_channel', { channel: 3 }, undefined, false);
   expect($(rowOf(el, 3)?.shadowRoot, '.zap.switching')).not.toBeNull();
   expect(text(el)).toContain('Switching to 3 Polsat');
 
@@ -183,7 +184,35 @@ test('tvg-switch calls the switch action and marks the row for 1.6 seconds', asy
   expect(text(el)).not.toContain('Switching to');
 });
 
-test('a failed switch sends a hass-notification', async () => {
+test('the switching feedback does not stay when the card is detached and attached again', async () => {
+  const { el } = await mount();
+  $<HTMLElement>(rowOf(el, 3)?.shadowRoot, '.zap')?.click();
+  await settle(el);
+  expect(text(el)).toContain('Switching to 3 Polsat');
+
+  el.remove();
+  document.body.append(el);
+  await settle(el);
+  expect($(rowOf(el, 3)?.shadowRoot, '.zap.switching')).toBeNull();
+  expect(text(el)).not.toContain('Switching to');
+});
+
+test('a text channel number such as 5.1 is shown, switched to and opened as it is', async () => {
+  const config = { ...CONFIG, sections: [{ channels: [{ number: '5.1', name: 'KQED', epg_id: 'TVN' }] }] };
+  const { el, callService } = await mount(makeHass(), config);
+  const row = rows(el)[0];
+  expect($(row?.shadowRoot, '.number')?.textContent).toBe('5.1');
+
+  $<HTMLElement>(row?.shadowRoot, '.zap')?.click();
+  await settle(el);
+  expect(callService).toHaveBeenCalledWith('script', 'cable_box_go_to_channel', { channel: '5.1' }, undefined, false);
+
+  $<HTMLElement>(row?.shadowRoot, '.info')?.click();
+  await settle(el);
+  expect($(el.shadowRoot, 'tvg-channel-view')).not.toBeNull();
+});
+
+test('a failed switch sends one hass-notification, because HA is told not to show its own', async () => {
   const setup = makeHass();
   setup.callService.mockRejectedValueOnce(new Error('offline'));
   const { el } = await mount(setup);
@@ -260,6 +289,26 @@ test('a channel whose guide id the integration does not keep says it is not sele
   expect($($(el.shadowRoot, 'tvg-channel-view')?.shadowRoot, '.no-guide')?.textContent).toBe(
     'This channel is not selected in the TV guide integration. Select it in the integration options.',
   );
+});
+
+test('a channel that becomes selected on the server stops saying it is not selected after the next refresh', async () => {
+  const config = {
+    ...CONFIG,
+    sections: [{ channels: [{ number: 7, name: 'TVP 2', epg_id: 'TVP 2' }, { number: 5, name: 'TVN', epg_id: 'TVN' }] }],
+  };
+  const { el, server } = await mount(makeHass(), config);
+  expect($(rowOf(el, 7)?.shadowRoot, '.now .title')?.textContent).toBe('Not selected in the integration');
+
+  server.channels = [...channels, { id: 'TVP 2', name: 'TVP 2', icon: null }];
+  server.now = { ...server.now, 'TVP 2': sport };
+  await vi.advanceTimersByTimeAsync(60 * 1000);
+  await settle(el);
+  expect($(rowOf(el, 7)?.shadowRoot, '.now .title')?.textContent).not.toBe('Not selected in the integration');
+
+  $<HTMLElement>(rowOf(el, 7)?.shadowRoot, '.info')?.click();
+  await settle(el);
+  const view = $(el.shadowRoot, 'tvg-channel-view');
+  expect($(view?.shadowRoot, '.no-guide')?.textContent ?? '').not.toContain('not selected');
 });
 
 test('the older schedule answer is dropped when another channel was opened meanwhile', async () => {
@@ -473,7 +522,7 @@ test('Enter in the search box switches to the first result', async () => {
   const input = await typeQuery(el, 'tvn');
   input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, composed: true }));
   await settle(el);
-  expect(callService).toHaveBeenCalledWith('script', 'cable_box_go_to_channel', { channel: 5 });
+  expect(callService).toHaveBeenCalledWith('script', 'cable_box_go_to_channel', { channel: 5 }, undefined, false);
 });
 
 test('a blank query shows the normal list and a query without matches says so', async () => {

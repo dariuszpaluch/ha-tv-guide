@@ -33,6 +33,12 @@ const AIRINGS_SHOWN = 3;
 type GroupKey = 'same' | 'others';
 
 /**
+ * The age chip: `12` becomes `12+`. Other systems, such as `PG-13` or `FSK 12`, stay as the guide gives them.
+ * @param rating Age rating from the guide.
+ */
+const ageLabel = (rating: string): string => (/^\d+$/.test(rating) ? `${rating}+` : rating);
+
+/**
  * The details of one programme. It slides over the channel view in the sheet.
  * Below the description it lists other airings of the programme, first on its own channel, then on the other channels.
  * It has one `header` (the sheet starts a close drag from it) and no other.
@@ -211,7 +217,7 @@ export class TvgProgrammeView extends LitElement {
   private renderChips(programme: Programme) {
     const chips = [
       ...programme.categories.map((category) => html`<span>${category}</span>`),
-      programme.rating ? html`<span class="age">${programme.rating}+</span>` : null,
+      programme.rating ? html`<span class="age">${ageLabel(programme.rating)}</span>` : null,
       programme.year ? html`<span>${programme.year}</span>` : null,
       programme.countries.length ? html`<span>${programme.countries.join(', ')}</span>` : null,
       programme.star_rating ? html`<span>★ ${programme.star_rating}</span>` : null,

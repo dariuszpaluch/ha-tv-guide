@@ -1,6 +1,8 @@
 from dataclasses import replace
 from datetime import datetime, timedelta
 
+import pytest
+
 from custom_components.tv_guide.search import (
     airings,
     normalize,
@@ -11,9 +13,25 @@ from custom_components.tv_guide.search import (
 )
 from tests.conftest import NOW, WAW
 
+# The card has the same cases in frontend/src/utils/normalize.test.ts: both sides must agree.
+NORMALIZE_CASES = [
+    ("  ŻYCIE Łódź ", "zycie lodz"),
+    ("Straße", "strasse"),
+    ("Kırmızı", "kirmizi"),
+    ("Søren", "soren"),
+    ("Đoković", "dokovic"),
+    ("Æble", "aeble"),
+    ("Œuvre", "oeuvre"),
+    # Only non-spacing marks (Mn) go. The Devanagari vowel sign in "की" is a spacing mark (Mc), so it stays.
+    ("की", "की"),
+    ("กำ", "กา"),
+    ("ที่", "ท"),
+]
 
-def test_normalize():
-    assert normalize("  ŻYCIE Łódź ") == "zycie lodz"
+
+@pytest.mark.parametrize(("text", "expected"), NORMALIZE_CASES)
+def test_normalize(text, expected):
+    assert normalize(text) == expected
 
 
 def test_now_on_air(guide):

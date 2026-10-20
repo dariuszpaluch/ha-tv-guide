@@ -12,6 +12,7 @@ import {
   switchServiceCall,
   validateConfig,
   type ChannelConfig,
+  type ChannelNumber,
   type SectionConfig,
   type SwitchAction,
   type TvGuideConfig,
@@ -94,8 +95,8 @@ export class TvGuide extends LitElement {
   @state() private nowMs = Date.now();
   @state() private query = '';
   @state() private results?: SearchResults;
-  @state() private activeNumber?: number;
-  @state() private switchingNumber?: number;
+  @state() private activeNumber?: ChannelNumber;
+  @state() private switchingNumber?: ChannelNumber;
   @state() private details?: Details;
 
   private hassObject?: HomeAssistant;
@@ -173,10 +174,14 @@ export class TvGuide extends LitElement {
     this.startRefreshing();
   }
 
-  /** Stops the timers and the running search. A card that is off the page makes no requests. */
+  /**
+   * Stops the timers and the running search. A card that is off the page makes no requests.
+   * The switching feedback ends with its timer, so it cannot stay on after the card comes back.
+   */
   disconnectedCallback(): void {
     this.stopRefreshing();
     clearTimeout(this.switchTimer);
+    this.switchingNumber = undefined;
     this.runner?.cancel();
     super.disconnectedCallback();
   }
@@ -221,7 +226,7 @@ export class TvGuide extends LitElement {
 
   /**
    * Loads the guide state and what is on now, all at once, so a failing request does not hold back the others.
-   * The client caches the channels for the session.
+   * The channels are asked every time, so a change of the selection in the integration shows up.
    * A failure shows a message; the next tick tries again, so the card recovers when the integration is ready.
    */
   private async refresh(): Promise<void> {
@@ -262,7 +267,7 @@ export class TvGuide extends LitElement {
   }
 
   /** The first channel with this number. */
-  private channelByNumber(number: number): ChannelConfig | undefined {
+  private channelByNumber(number: ChannelNumber): ChannelConfig | undefined {
     return this.channels().find((channel) => channel.number === number);
   }
 
@@ -278,7 +283,10 @@ export class TvGuide extends LitElement {
 
   // ---- switching ----
 
-  /** Calls the switch action for a channel. A failure goes to the HA notification area. */
+  /**
+   * Calls the switch action for a channel. A failure goes to the HA notification area.
+   * HA is told not to show its own error toast, so the user sees one message: the card's.
+   */
   private switchTo(channel: ChannelConfig): void {
     const { config, hassObject } = this;
     if (!config || !hassObject) return;
@@ -289,7 +297,7 @@ export class TvGuide extends LitElement {
     this.switchTimer = setTimeout(() => {
       this.switchingNumber = undefined;
     }, SWITCH_FEEDBACK_MS);
-    hassObject.callService(call.domain, call.service, call.data).then(
+    hassObject.callService(call.domain, call.service, call.data, undefined, false).then(
       () => {
         this.activeNumber = channel.number;
       },

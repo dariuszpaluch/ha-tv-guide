@@ -39,12 +39,19 @@ class GuideNotLoaded(Exception):
 
 
 def get_coordinator(hass: HomeAssistant, entry_id: str | None) -> TvGuideCoordinator:
-    """Return the coordinator of an entry. Without `entry_id`, the first `tv_guide` entry.
+    """Return the coordinator of an entry.
+
+    Without `entry_id` the first loaded `tv_guide` entry answers. A disabled or retrying entry
+    in front of it must not hide it. When no entry is loaded, the first entry gives `GuideNotLoaded`.
 
     Raises:
         GuideNotFound: there is no such entry.
         GuideNotLoaded: the entry is not in the loaded state.
     """
+    if entry_id is None:
+        loaded = hass.config_entries.async_loaded_entries(DOMAIN)
+        if loaded:
+            return loaded[0].runtime_data
     entries = hass.config_entries.async_entries(DOMAIN)
     entry = next((e for e in entries if entry_id is None or e.entry_id == entry_id), None)
     if entry is None:

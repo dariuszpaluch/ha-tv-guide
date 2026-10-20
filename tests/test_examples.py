@@ -16,7 +16,7 @@ def test_example_card_config_is_valid() -> None:
     assert channels
     for channel in channels:
         assert set(channel) <= CHANNEL_KEYS, channel
-        assert isinstance(channel["number"], int), channel
+        assert isinstance(channel["number"], (int, str)), channel
         assert isinstance(channel["name"], str), channel
         assert isinstance(channel["epg_id"], str), channel
     numbers = [channel["number"] for channel in channels]

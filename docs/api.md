@@ -56,11 +56,11 @@ Times in output are ISO 8601 strings with the offset of the source. Times in inp
 
 ## Title matching
 
-Used by `search` and `airings`. Normalized text = lower case, Unicode `NFKD` without combining marks, `ł` -> `l`, outer whitespace removed.
+Used by `search` and `airings`. Normalized text = lower case, Unicode `NFKD` without non-spacing marks (Unicode category `Mn`), then the letters that `NFKD` does not split: `ł` -> `l`, `ß` -> `ss`, `ı` -> `i`, `ø` -> `o`, `đ` -> `d`, `æ` -> `ae`, `œ` -> `oe`; outer whitespace removed. The card uses the same rule for channel names.
 
 ## WebSocket commands
 
-Every command takes an optional `entry_id: string`. Without it, the first `tv_guide` entry is used.
+Every command takes an optional `entry_id: string`. Without it, the first loaded `tv_guide` entry is used. If none is loaded, the answer is `not_loaded` when an entry exists.
 
 Errors (`connection.send_error`):
 

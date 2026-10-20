@@ -78,6 +78,25 @@ class Guide:
             fetched_at=datetime.fromisoformat(data["fetched_at"]),
         )
 
+    def for_selection(self, selected: set[str]) -> Guide:
+        """Cut the guide to a new channel selection.
+
+        Channels that are no longer selected are removed. A selected channel that this guide
+        does not hold, but the source lists, stays empty until the next download.
+        """
+        if selected & set(self.available_channels) == set(self.channels):
+            return self
+        ids = [cid for cid in self.available_channels if cid in selected]
+        return Guide(
+            channels={
+                cid: self.channels.get(cid) or Channel(id=cid, name=self.available_channels[cid], icon=None)
+                for cid in ids
+            },
+            programmes={cid: self.programmes.get(cid, []) for cid in ids},
+            available_channels=self.available_channels,
+            fetched_at=self.fetched_at,
+        )
+
     def image_urls(self) -> dict[str, str]:
         """Map image id to source URL for every poster in the guide."""
         return {image_id(p.image_url): p.image_url for items in self.programmes.values() for p in items if p.image_url}

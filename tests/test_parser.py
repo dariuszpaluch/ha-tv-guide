@@ -120,3 +120,50 @@ def test_parse_skips_bad_time_and_warns_once(caplog):
         guide = parse_guide(io.BytesIO(xml), {"TVN"}, NOW)
     assert [p.title for p in guide.programmes["TVN"]] == ["P0", "P3"]
     assert [r.getMessage() for r in caplog.records] == ["Skipped 2 programmes with a bad start or stop time"]
+
+
+def test_parse_programme_without_stop_ends_when_the_next_one_starts(caplog):
+    xml = (
+        b'<tv><channel id="TVN"><display-name>TVN</display-name></channel>'
+        b'<programme start="20261019210000 +0000" channel="TVN"><title>Second</title></programme>'
+        b'<programme start="20261019190000 +0000" channel="TVN"><title>First</title></programme>'
+        b'<programme start="20261019200000 +0000" stop="20261019210000 +0000" channel="TVN">'
+        b"<title>Middle</title></programme>"
+        b'<programme start="20261019220000 +0000" channel="TVN"><title>Last, no next</title></programme>'
+        b"</tv>"
+    )
+    with caplog.at_level("WARNING", logger="custom_components.tv_guide.parser"):
+        guide = parse_guide(io.BytesIO(xml), {"TVN"}, NOW)
+    assert [(p.title, p.start.hour, p.stop.hour) for p in guide.programmes["TVN"]] == [
+        ("First", 19, 20),
+        ("Middle", 20, 21),
+        ("Second", 21, 22),
+    ]
+    assert caplog.records == []
+
+
+def test_parse_programme_without_stop_that_ended_long_ago_is_dropped():
+    xml = (
+        b'<tv><channel id="TVN"><display-name>TVN</display-name></channel>'
+        b'<programme start="20240101100000 +0000" channel="TVN"><title>Old</title></programme>'
+        b'<programme start="20240101110000 +0000" stop="20240101120000 +0000" channel="TVN">'
+        b"<title>Old too</title></programme>"
+        b"</tv>"
+    )
+    assert parse_guide(io.BytesIO(xml), {"TVN"}, NOW).programmes["TVN"] == []
+
+
+_EMPTY_FIRST_NAME = (
+    b'<tv><channel id="A"><display-name> </display-name><display-name>Channel A</display-name></channel>'
+    b'<channel id="B"><display-name></display-name></channel></tv>'
+)
+
+
+def test_parse_channel_name_is_the_first_non_empty_display_name():
+    assert [(c.id, c.name) for c in parse_channels(io.BytesIO(_EMPTY_FIRST_NAME))] == [("A", "Channel A"), ("B", "B")]
+
+
+def test_parse_available_channels_use_the_first_non_empty_display_name():
+    guide = parse_guide(io.BytesIO(_EMPTY_FIRST_NAME), {"A"}, NOW)
+    assert guide.available_channels == {"A": "Channel A", "B": "B"}
+    assert guide.channels["A"].name == "Channel A"

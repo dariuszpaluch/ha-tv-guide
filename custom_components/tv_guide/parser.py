@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 import xml.etree.ElementTree as ET
 from collections.abc import Iterator
+from dataclasses import replace
 from datetime import UTC, datetime
 from typing import IO
 
@@ -39,10 +40,13 @@ def parse_guide(stream: IO[bytes], channel_ids: set[str], now: datetime) -> Guid
     Programmes that ended more than `KEEP_ENDED` before `now`, programmes without a title and
     a second programme with the same channel and start are dropped. A programme with a time
     that cannot be read is skipped, and one warning with the count is logged at the end.
+    The XMLTV format allows a programme without `stop`: it ends when the next one on the channel
+    starts. The last programme of a channel without `stop` is dropped, because its end is unknown.
     """
     channels: dict[str, Channel] = {}
     available: dict[str, str] = {}
     found: dict[str, dict[datetime, Programme]] = {cid: {} for cid in channel_ids}
+    open_ended: set[tuple[str, datetime]] = set()
     oldest = now - KEEP_ENDED
     skipped = 0
     for element in _elements(stream, "channel", "programme"):
@@ -60,16 +64,38 @@ def parse_guide(stream: IO[bytes], channel_ids: set[str], now: datetime) -> Guid
         except ValueError:
             skipped += 1
             continue
-        if programme and programme.stop >= oldest:
-            found[channel_id].setdefault(programme.start, programme)
+        if not programme:
+            continue
+        no_stop = element.get("stop") is None
+        # The stop of a programme without one is known only after the sort, so check its age then.
+        if (no_stop or programme.stop >= oldest) and programme.start not in found[channel_id]:
+            found[channel_id][programme.start] = programme
+            if no_stop:
+                open_ended.add((channel_id, programme.start))
     if skipped:
         _LOGGER.warning("Skipped %d programmes with a bad start or stop time", skipped)
     return Guide(
         channels=channels,
-        programmes={cid: sorted(found[cid].values(), key=lambda p: p.start) for cid in channels},
+        programmes={cid: _close_open_ended(cid, found[cid], open_ended, oldest) for cid in channels},
         available_channels=available,
         fetched_at=now,
     )
+
+
+def _close_open_ended(
+    channel_id: str, found: dict[datetime, Programme], open_ended: set[tuple[str, datetime]], oldest: datetime
+) -> list[Programme]:
+    """Sort the programmes of a channel and give each one without `stop` the start of the next one."""
+    ordered = sorted(found.values(), key=lambda p: p.start)
+    closed: list[Programme] = []
+    for index, programme in enumerate(ordered):
+        if (channel_id, programme.start) in open_ended:
+            if index + 1 == len(ordered):
+                continue
+            programme = replace(programme, stop=ordered[index + 1].start)
+        if programme.stop >= oldest:
+            closed.append(programme)
+    return closed
 
 
 def _elements(stream: IO[bytes], *tags: str) -> Iterator[ET.Element]:
@@ -101,7 +127,7 @@ def _channel(element: ET.Element) -> Channel:
     icon = element.find("icon")
     return Channel(
         id=channel_id,
-        name=_text(element.find("display-name")) or channel_id,
+        name=next((name for e in element.findall("display-name") if (name := _text(e))), channel_id),
         icon=icon.get("src") if icon is not None else None,
     )
 
@@ -117,13 +143,15 @@ def _xmltv_time(value: str) -> datetime:
 def _programme(element: ET.Element) -> Programme | None:
     """Build a programme, or None when it has no title.
 
-    Raises ValueError when the start or stop time cannot be read.
+    Raises ValueError when the start or stop time cannot be read. A missing `stop` is not an error:
+    the programme gets `stop = start` and the caller fills it in from the next programme.
     """
     title = _text(element.find("title"))
     if not title:
         return None
     start = _xmltv_time(element.get("start", ""))
-    stop = _xmltv_time(element.get("stop", ""))
+    stop_text = element.get("stop")
+    stop = start if stop_text is None else _xmltv_time(stop_text)
     icon = element.find("icon")
     rating = _text(element.find("rating/value"))
     year = _text(element.find("date"))

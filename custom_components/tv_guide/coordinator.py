@@ -57,14 +57,16 @@ class TvGuideCoordinator(DataUpdateCoordinator[Guide]):
         return self._last_success
 
     async def async_load_stored(self) -> bool:
-        """Use the stored guide as the current data. Return False when it is missing or does not fit.
+        """Use the stored guide as the current data. Return False when it is missing or has no selected channel.
 
-        A guide stored for other channels would show channels the user removed,
-        so it is not used.
+        The guide is cut to the current selection. A channel that is new in the selection has
+        no programmes until the first download works. Without a common channel the stored guide
+        would show nothing, so the setup waits for the download instead.
         """
         guide = await self._store.async_load()
-        if guide is None or set(guide.channels) != self._selected & set(guide.available_channels):
+        if guide is None or not self._selected & set(guide.channels):
             return False
+        guide = guide.for_selection(self._selected)
         self.async_set_updated_data(guide)
         self._last_success = guide.fetched_at
         return True
