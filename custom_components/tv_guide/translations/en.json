@@ -56,9 +56,6 @@
     "reminder_starting_title": {
       "message": "{channel_name} · {time}"
     },
-    "reminder_starting_message": {
-      "message": "{title} starts in 5 minutes"
-    },
     "reminder_gone_message": {
       "message": "{title} is no longer in the guide"
     }
