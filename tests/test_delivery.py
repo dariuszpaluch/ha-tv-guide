@@ -137,7 +137,7 @@ async def test_starting_goes_to_each_phone_and_fires_the_event(hass: HomeAssista
     assert [call.data for call in pixel] == [
         {
             "title": "TVN · 19:00",
-            "message": "Fakty starts in 5 minutes",
+            "message": "Fakty",
             "data": {"tag": f"tv_guide_{PROGRAMME_ID}"},
         }
     ]
@@ -170,9 +170,7 @@ async def test_polish_starting_text_uses_the_server_time_zone(hass: HomeAssistan
 
     await async_deliver(hass, reminder, "starting", "TVN")
 
-    assert [(call.data["title"], call.data["message"]) for call in pixel] == [
-        ("TVN · 19:00", "Fakty zaczyna się za 5 minut")
-    ]
+    assert [(call.data["title"], call.data["message"]) for call in pixel] == [("TVN · 19:00", "Fakty")]
 
 
 async def test_one_failing_phone_does_not_stop_the_others(

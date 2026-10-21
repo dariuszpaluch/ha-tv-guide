@@ -12,6 +12,7 @@
 ### Integration
 
 - New command `tv_guide/next`: the first programme after now on each channel.
+- A reminder notification shows only the programme title under the channel and the start time. "starts in 5 minutes" is gone.
 
 ## 0.2.0 - 2026-10-20
 

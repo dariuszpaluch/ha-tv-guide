@@ -122,8 +122,6 @@ async def _async_texts(
 
     if kind == "gone":
         return channel_name, text("reminder_gone_message", title=reminder.title)
+    # The title already has the start time, so the message is only the programme title.
     time = dt_util.as_local(reminder.start).strftime(TIME_FORMAT)
-    return (
-        text("reminder_starting_title", channel_name=channel_name, time=time),
-        text("reminder_starting_message", title=reminder.title),
-    )
+    return text("reminder_starting_title", channel_name=channel_name, time=time), reminder.title

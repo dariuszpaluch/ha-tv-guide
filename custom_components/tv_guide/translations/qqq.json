@@ -54,10 +54,7 @@
   },
   "exceptions": {
     "reminder_starting_title": {
-      "message": "Title of the phone notification for a programme that starts soon. {channel_name} is the TV channel name, {time} is the start time (24-hour, for example 20:00)."
-    },
-    "reminder_starting_message": {
-      "message": "Text of the phone notification that a programme starts in 5 minutes. {title} is the programme title."
+      "message": "Title of the phone notification for a programme that starts soon. {channel_name} is the TV channel name, {time} is the start time (24-hour, for example 20:00). The text under it is only the programme title."
     },
     "reminder_gone_message": {
       "message": "Text of the phone notification when a programme with a reminder was removed from the guide. {title} is the programme title."
