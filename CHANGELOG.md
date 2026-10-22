@@ -4,7 +4,7 @@
 
 ### Card
 
-- The channel list shows what comes next on each channel, with its start time.
+- The channel list shows what comes next on each channel, with its start time, under a blue "Next" label.
 - A TV with antenna waves shows in the middle of the list and the schedule while they load.
 - Search waits 250 ms after the last letter before it asks the server, so fast typing sends one search, not one per letter.
 - Back works like back in a browser: it shows the screen you came from. From a programme that you opened in search, back takes you to the search results, not to the channel schedule. From an airing, back takes you to the programme you opened it from.
