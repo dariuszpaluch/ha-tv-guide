@@ -199,6 +199,7 @@ export const rowStyles = [
       white-space: nowrap;
     }
     .next .label {
+      color: var(--primary-color);
       font-size: 10.5px;
       font-weight: 500;
       letter-spacing: 0.04em;
