@@ -19,7 +19,7 @@ A TV guide in your Home Assistant dashboard: what is on now, what comes next, th
   <tr>
     <td width="25%">
 
-https://github.com/user-attachments/assets/bc4a4043-7b26-4217-bfd6-6f042a638772
+[https://github.com/user-attachments/assets/bc4a4043-7b26-4217-bfd6-6f042a638772](https://github.com/user-attachments/assets/8de1d84b-b908-4c08-9e7d-70f1f04363bc)
 
 </td>
     <td width="25%"><img src="docs/images/channel-list.png" alt="Channel list with the programme on now"></td>
