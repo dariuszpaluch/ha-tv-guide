@@ -18,9 +18,10 @@ A TV guide in your Home Assistant dashboard: what is on now, what comes next, th
 - Channel list with the programme on now, a progress bar and what comes next. Group the channels in sections.
 - Schedule for each day, with posters. It opens at the programme on now. A TV day starts at 05:00, like in a printed guide.
 - Channel details open full screen on a phone and as a dialog on a computer.
+- Back works like back in a browser: it shows the screen you came from. On a phone, swipe right to go back and drag the sheet down to close it.
 - Programme details: poster, description, category, age rating, year, and more airings of the same programme.
 - Search in channels, programmes on now and programmes later.
-- Switch the channel with one tap. Any Home Assistant action works.
+- Switch the channel with one tap on the channel number or logo, or with **Switch to** in the details. Any Home Assistant action works.
 - Set a reminder. Your phone gets a notification 5 minutes before the programme starts.
 - Works with any [XMLTV](https://wiki.xmltv.org/index.php/XMLTVFormat) guide, plain or compressed.
 - Keeps the last good guide on disk, so the card works when the guide source is down.
