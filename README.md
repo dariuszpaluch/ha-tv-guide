@@ -9,13 +9,24 @@
 
 A TV guide in your Home Assistant dashboard: what is on now, what comes next, the schedule for the next days, and search in channels and programmes. A tap switches your TV or cable box to the channel with any Home Assistant action: a script, a remote or a media player.
 
-| Channel list | Channel schedule | Programme details |
-| --- | --- | --- |
-| ![Channel list with the programme on now](docs/images/channel-list.png) | ![Schedule of one channel for one day](docs/images/channel-schedule.png) | ![Details of one programme](docs/images/programme-details.png) |
-
+<table>
+  <tr>
+    <th>Video</th>
+    <th>Channel list</th>
+    <th>Channel schedule</th>
+    <th>Programme details</th>
+  </tr>
+  <tr>
+    <td width="25%">
 
 https://github.com/user-attachments/assets/bc4a4043-7b26-4217-bfd6-6f042a638772
 
+</td>
+    <td width="25%"><img src="docs/images/channel-list.png" alt="Channel list with the programme on now"></td>
+    <td width="25%"><img src="docs/images/channel-schedule.png" alt="Schedule of one channel for one day"></td>
+    <td width="25%"><img src="docs/images/programme-details.png" alt="Details of one programme"></td>
+  </tr>
+</table>
 
 ## Features
 
