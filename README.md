@@ -13,6 +13,10 @@ A TV guide in your Home Assistant dashboard: what is on now, what comes next, th
 | --- | --- | --- |
 | ![Channel list with the programme on now](docs/images/channel-list.png) | ![Schedule of one channel for one day](docs/images/channel-schedule.png) | ![Details of one programme](docs/images/programme-details.png) |
 
+
+https://github.com/user-attachments/assets/bc4a4043-7b26-4217-bfd6-6f042a638772
+
+
 ## Features
 
 - Channel list with the programme on now, a progress bar and what comes next. Group the channels in sections.
